@@ -1,2 +1,6 @@
 /target
 /Cargo.lock
+
+/server/node_modules
+/server/pkg
+/server/package-lock.json
