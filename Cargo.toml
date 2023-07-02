@@ -1,3 +1,11 @@
-[workspace]
+[package]
+name = "mcrs"
+version = "0.1.0"
+edition = "2021"
 resolver = "2"
-members = [ "mcrs-core" ]
+
+[lib]
+
+[[bin]]
+name = "mcrs-bin"
+path = "src/main.rs"
