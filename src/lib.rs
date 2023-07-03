@@ -1,10 +1,12 @@
 use winit::{event::*, event_loop::EventLoop, window::WindowBuilder};
 
+mod window;
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
-pub fn run() {
+pub async fn run() {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -36,14 +38,44 @@ pub fn run() {
             .expect("Couldn't append canvas to document body.");
     }
 
+    let mut window_state = window::WindowState::new(window).await;
+
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             window_id,
             ref event,
-        } if window_id == window.id() => match event {
-            WindowEvent::CloseRequested => control_flow.set_exit(),
-            _ => {}
-        },
+        } if window_id == window_state.window().id() => {
+            if !window_state.input(event) {
+                match event {
+                    WindowEvent::CloseRequested => control_flow.set_exit(),
+                    WindowEvent::Resized(physical_size) => {
+                        window_state.resize(*physical_size);
+                    }
+                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                        // new_inner_size is &&mut so we have to dereference it twice
+                        window_state.resize(**new_inner_size);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Event::RedrawRequested(window_id) if window_id == window_state.window().id() => {
+            window_state.update();
+            match window_state.render() {
+                Ok(_) => {}
+                // Reconfigure the surface if lost
+                Err(wgpu::SurfaceError::Lost) => window_state.resize(window_state.size),
+                // The system is out of memory, we should probably quit
+                Err(wgpu::SurfaceError::OutOfMemory) => control_flow.set_exit(),
+                // All other errors (Outdated, Timeout) should be resolved by the next frame
+                Err(e) => eprintln!("{:?}", e),
+            }
+        }
+        Event::MainEventsCleared => {
+            // RedrawRequested will only trigger once, unless we manually
+            // request it.
+            window_state.window().request_redraw();
+        }
         _ => {}
     })
 }
