@@ -1,5 +1,6 @@
 use winit::{event::*, event_loop::EventLoop, window::WindowBuilder};
 
+mod texture;
 mod window;
 
 #[cfg(target_arch = "wasm32")]
