@@ -2,6 +2,7 @@ use winit::{event::*, event_loop::EventLoop, window::WindowBuilder};
 
 mod texture;
 mod window;
+mod camera;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
