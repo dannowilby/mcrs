@@ -1,8 +1,9 @@
 use winit::{event::*, event_loop::EventLoop, window::WindowBuilder};
 
+mod camera;
+mod engine;
 mod texture;
 mod window;
-mod camera;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -41,6 +42,9 @@ pub async fn run() {
     }
 
     let mut window_state = window::WindowState::new(window).await;
+    use crate::engine::renderer::RenderGroupBuilder;
+    let render_group = RenderGroupBuilder::new().build();
+    render_group.add_render_object();
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
