@@ -8,6 +8,8 @@ mod window;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+use crate::engine::test_render_initialization;
+
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub async fn run() {
     cfg_if::cfg_if! {
@@ -21,6 +23,7 @@ pub async fn run() {
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
+    // let state = state::State::default();
 
     #[cfg(target_arch = "wasm32")]
     {
@@ -42,23 +45,30 @@ pub async fn run() {
     }
 
     let mut window_state = window::WindowState::new(window).await;
+    let mut render_group = test_render_initialization(&window_state).await;
+    /*
     use crate::engine::renderer::RenderGroupBuilder;
     let render_group = RenderGroupBuilder::new().build();
     render_group.add_render_object();
-
+    */
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             window_id,
             ref event,
         } if window_id == window_state.window().id() => {
-            if !window_state.input(event) {
+            // ecs.eval_input(event);
+            if true {
+                // !window_state.input(event) {
                 match event {
                     WindowEvent::CloseRequested => control_flow.set_exit(),
                     WindowEvent::Resized(physical_size) => {
-                        window_state.resize(*physical_size);
+                        // ecs.dispatch("resize", physical_size);
+                        // window_state.resize(*physical_size);
+                        // todo!();
                     }
                     WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                         // new_inner_size is &&mut so we have to dereference it twice
+                        // ecs.dispatch("resize", **new_inner_size);
                         window_state.resize(**new_inner_size);
                     }
                     _ => {}
@@ -66,11 +76,16 @@ pub async fn run() {
             }
         }
         Event::RedrawRequested(window_id) if window_id == window_state.window().id() => {
-            window_state.update();
-            match window_state.render() {
+            // window_state.update();
+
+            // ecs.process_events();
+            match render_group.render(&window_state) {
                 Ok(_) => {}
                 // Reconfigure the surface if lost
-                Err(wgpu::SurfaceError::Lost) => window_state.resize(window_state.size),
+                Err(wgpu::SurfaceError::Lost) => {
+                    // ecs.dispatch("resize", window_state.size);
+                    window_state.resize(window_state.size);
+                }
                 // The system is out of memory, we should probably quit
                 Err(wgpu::SurfaceError::OutOfMemory) => control_flow.set_exit(),
                 // All other errors (Outdated, Timeout) should be resolved by the next frame

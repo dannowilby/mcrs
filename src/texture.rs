@@ -1,6 +1,11 @@
 use anyhow::*;
 use image::GenericImageView;
 
+use crate::{
+    engine::uniform::{Uniform, UniformData},
+    window::WindowState,
+};
+
 pub struct Texture {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
@@ -123,5 +128,59 @@ impl Texture {
             view,
             sampler,
         }
+    }
+
+    pub fn build_uniform(
+        self,
+        window_state: &WindowState,
+        location: u32,
+    ) -> (Uniform, wgpu::BindGroupLayout) {
+        let device = &window_state.device;
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: location,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: location + 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("texture_bind_group_layout"),
+            });
+
+        let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &texture_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: location,
+                    resource: wgpu::BindingResource::TextureView(&self.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: location + 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+            ],
+            label: Some("diffuse_bind_group"),
+        });
+
+        (
+            Uniform {
+                bind_group: diffuse_bind_group,
+                location,
+                data: UniformData::Texture(self),
+            },
+            texture_bind_group_layout,
+        )
     }
 }

@@ -13,6 +13,7 @@ pub struct RenderGroupBuilder<'a> {
     uniforms: Vec<BindGroupLayout>,
     shader: Option<ShaderModule>,
     label: String,
+    window_state: &'a WindowState,
 }
 
 ///
@@ -25,35 +26,41 @@ pub struct RenderGroupBuilder<'a> {
 ///  Used to build a RenderGroup
 ///  Uses
 impl<'a> RenderGroupBuilder<'a> {
-    pub fn new(label: &str) -> Self {
+    pub fn new(window_state: &'a WindowState, label: &str) -> Self {
         RenderGroupBuilder {
             vertex_format: None,
             uniforms: Vec::new(),
             shader: None,
             label: label.to_string(),
+            window_state: window_state,
         }
     }
 
-    pub fn shader(&mut self, window_state: &WindowState, source: &str) {
+    pub fn shader(mut self, source: &str) -> Self {
+        let window_state = self.window_state;
         let shader = window_state
             .device
             .create_shader_module(ShaderModuleDescriptor {
                 label: Some("Shader"),
-                source: ShaderSource::Wgsl(include_str!("../shader.wgsl").into()),
+                source: ShaderSource::Wgsl(include_str!("../test_shader.wgsl").into()),
             });
 
         self.shader = Some(shader);
+        self
     }
 
-    pub fn vertex_format(&mut self, format: VertexBufferLayout<'a>) {
+    pub fn vertex_format(mut self, format: VertexBufferLayout<'a>) -> Self {
         self.vertex_format = Some(format);
+        self
     }
 
-    pub fn with(&mut self, layout: BindGroupLayout) {
+    pub fn with(mut self, layout: BindGroupLayout) -> Self {
         self.uniforms.push(layout);
+        self
     }
 
-    pub fn build(self, window_state: &WindowState) -> RenderGroup {
+    pub fn build(self) -> RenderGroup {
+        let window_state = self.window_state;
         let layouts: Vec<&BindGroupLayout> = self.uniforms.iter().collect();
 
         let shader = self.shader.expect("No shader set for RenderGroup.");
@@ -132,13 +139,14 @@ impl<'a> RenderGroupBuilder<'a> {
     }
 }
 
-/// render_group.add_object("chunk-0-0-0", render_object);
-/// render_group.render();
-struct RenderGroup {
+use crate::engine::render_object::RenderObject;
+use crate::engine::uniform::{Uniform, UniformData};
+
+pub struct RenderGroup {
     depth_texture: texture::Texture,
     pipeline: RenderPipeline,
-    objects: HashMap<String, RenderObject>,
-    uniforms: HashMap<String, Uniform>,
+    pub objects: HashMap<String, RenderObject>,
+    pub uniforms: HashMap<String, Uniform>,
 }
 
 impl RenderGroup {
@@ -159,45 +167,35 @@ impl RenderGroup {
                 label: Some("Render Encoder"),
             });
 
-        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
-                ops: Operations {
-                    load: LoadOp::Clear(wgpu::Color {
-                        r: 0.0,
-                        g: 0.0,
-                        b: 0.3,
-                        a: 1.0,
+        {
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.3,
+                            a: 1.0,
+                        }),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
                     }),
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &self.depth_texture.view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: true,
+                    stencil_ops: None,
                 }),
-                stencil_ops: None,
-            }),
-        });
+            });
 
-        render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_pipeline(&self.pipeline);
 
-        for uniform in self.uniforms.values().into_iter() {
-            let Uniform {
-                location,
-                bind_group,
-                data: _,
-            } = uniform;
-
-            render_pass.set_bind_group(*location, &bind_group, &[]);
-        }
-
-        for object in self.objects.values().into_iter() {
-            for uniform in object.uniforms.values().into_iter() {
+            for uniform in self.uniforms.values().into_iter() {
                 let Uniform {
                     location,
                     bind_group,
@@ -207,28 +205,13 @@ impl RenderGroup {
                 render_pass.set_bind_group(*location, &bind_group, &[]);
             }
 
-            render_pass.set_vertex_buffer(0, object.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(object.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            let index_length =
-                object.index_buffer.size() as u32 / std::mem::size_of::<f32>() as u32;
-            render_pass.draw_indexed(0..(index_length), 0, 0..1);
+            for object in self.objects.values().into_iter() {
+                object.render(&mut render_pass);
+            }
         }
-
         window_state.queue.submit(std::iter::once(encoder.finish()));
         output.present();
 
         Ok(())
     }
-}
-
-struct RenderObject {
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
-    uniforms: HashMap<String, Uniform>,
-}
-
-struct Uniform {
-    location: u32,
-    bind_group: BindGroup,
-    data: Buffer,
 }
