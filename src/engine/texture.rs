@@ -2,8 +2,11 @@ use anyhow::*;
 use image::GenericImageView;
 
 use crate::{
-    engine::uniform::{Uniform, UniformData},
-    window::WindowState,
+    engine::{
+        resources::load_binary,
+        uniform::{Uniform, UniformData, UniformLayout},
+    },
+    window_state,
 };
 
 pub struct Texture {
@@ -13,22 +16,15 @@ pub struct Texture {
 }
 
 impl Texture {
-    pub fn from_bytes(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        bytes: &[u8],
-        label: &str,
-    ) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], label: &str) -> Result<Self> {
         let img = image::load_from_memory(bytes)?;
-        Self::from_image(device, queue, &img, Some(label))
+        Self::from_image(&img, Some(label))
     }
 
-    pub fn from_image(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        img: &image::DynamicImage,
-        label: Option<&str>,
-    ) -> Result<Self> {
+    pub fn from_image(img: &image::DynamicImage, label: Option<&str>) -> Result<Self> {
+        let device = &window_state().device;
+        let queue = &window_state().queue;
+
         let rgba = img.to_rgba8();
         let dimensions = img.dimensions();
 
@@ -130,14 +126,10 @@ impl Texture {
         }
     }
 
-    pub fn build_uniform(
-        self,
-        window_state: &WindowState,
-        location: u32,
-    ) -> (Uniform, wgpu::BindGroupLayout) {
-        let device = &window_state.device;
-        let texture_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    pub fn create_layout(location: u32) -> UniformLayout {
+        let device = &window_state().device;
+        UniformLayout {
+            layout: device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: location,
@@ -157,30 +149,41 @@ impl Texture {
                     },
                 ],
                 label: Some("texture_bind_group_layout"),
-            });
+            }),
+            location,
+        }
+    }
 
-        let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &texture_bind_group_layout,
+    pub fn uniform(self, layout: &UniformLayout) -> Uniform {
+        let device = &window_state().device;
+
+        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &layout.layout,
             entries: &[
                 wgpu::BindGroupEntry {
-                    binding: location,
+                    binding: layout.location,
                     resource: wgpu::BindingResource::TextureView(&self.view),
                 },
                 wgpu::BindGroupEntry {
-                    binding: location + 1,
+                    binding: layout.location + 1,
                     resource: wgpu::BindingResource::Sampler(&self.sampler),
                 },
             ],
             label: Some("diffuse_bind_group"),
         });
 
-        (
-            Uniform {
-                bind_group: diffuse_bind_group,
-                location,
-                data: UniformData::Texture(self),
-            },
-            texture_bind_group_layout,
-        )
+        Uniform {
+            bind_group: texture_bind_group,
+            location: layout.location,
+            data: UniformData::Texture(self),
+        }
+    }
+
+    pub async fn load(src: &str) -> Self {
+        let texture_bytes = load_binary(src)
+            .await
+            .expect(&format!("Error loading binary file: {}", src));
+        Texture::from_bytes(texture_bytes.as_slice(), src)
+            .expect(&format!("Error loading image from bytes: {}", src))
     }
 }

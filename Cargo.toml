@@ -22,6 +22,7 @@ pollster = "0.3"
 bytemuck = { version = "1.12", features = [ "derive" ] }
 anyhow = "1.0"
 glam = { version = "0.24", default-features = false, features = ["libm"] }
+lazy_static = "1.4.0"
 
 [dependencies.image]
 version = "0.24.6"

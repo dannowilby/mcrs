@@ -1,7 +1,4 @@
-use wgpu::{
-    Buffer, Device, PipelineLayoutDescriptor, Queue, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptor, ShaderSource, Surface, SurfaceConfiguration, SurfaceError,
-};
+use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 

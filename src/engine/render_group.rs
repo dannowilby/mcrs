@@ -1,19 +1,17 @@
-use crate::{engine::render_window::RenderWindow, texture, window::WindowState};
-use std::collections::HashMap;
+use crate::engine::uniform::UniformLayout;
+
+use crate::window_state;
 
 use wgpu::{
-    BindGroup, BindGroupLayout, BindingResource, Buffer, CommandEncoderDescriptor, Device, LoadOp,
-    Operations, PipelineLayoutDescriptor, RenderPassColorAttachment, RenderPassDescriptor,
-    RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderSource,
-    SurfaceConfiguration, SurfaceError, TextureFormat, TextureViewDescriptor, VertexBufferLayout,
+    BindGroupLayout, PipelineLayoutDescriptor, RenderPipeline, RenderPipelineDescriptor,
+    ShaderModule, ShaderModuleDescriptor, ShaderSource, TextureFormat, VertexBufferLayout,
 };
 
 pub struct RenderGroupBuilder<'a> {
     vertex_format: Option<VertexBufferLayout<'a>>,
-    uniforms: Vec<BindGroupLayout>,
+    uniforms: Vec<UniformLayout>,
+    uniform_names: Vec<String>,
     shader: Option<ShaderModule>,
-    label: String,
-    window_state: &'a WindowState,
 }
 
 ///
@@ -26,23 +24,21 @@ pub struct RenderGroupBuilder<'a> {
 ///  Used to build a RenderGroup
 ///  Uses
 impl<'a> RenderGroupBuilder<'a> {
-    pub fn new(window_state: &'a WindowState, label: &str) -> Self {
+    pub fn new() -> Self {
         RenderGroupBuilder {
             vertex_format: None,
             uniforms: Vec::new(),
+            uniform_names: Vec::new(),
             shader: None,
-            label: label.to_string(),
-            window_state: window_state,
         }
     }
 
     pub fn shader(mut self, source: &str) -> Self {
-        let window_state = self.window_state;
-        let shader = window_state
+        let shader = window_state()
             .device
             .create_shader_module(ShaderModuleDescriptor {
                 label: Some("Shader"),
-                source: ShaderSource::Wgsl(include_str!("../test_shader.wgsl").into()),
+                source: ShaderSource::Wgsl(source.into()),
             });
 
         self.shader = Some(shader);
@@ -54,14 +50,14 @@ impl<'a> RenderGroupBuilder<'a> {
         self
     }
 
-    pub fn with(mut self, layout: BindGroupLayout) -> Self {
+    pub fn with(mut self, uniform_name: &str, layout: UniformLayout) -> Self {
         self.uniforms.push(layout);
+        self.uniform_names.push(uniform_name.to_owned());
         self
     }
 
     pub fn build(self) -> RenderGroup {
-        let window_state = self.window_state;
-        let layouts: Vec<&BindGroupLayout> = self.uniforms.iter().collect();
+        let layouts: Vec<&BindGroupLayout> = self.uniforms.iter().map(|x| &x.layout).collect();
 
         let shader = self.shader.expect("No shader set for RenderGroup.");
 
@@ -70,7 +66,7 @@ impl<'a> RenderGroupBuilder<'a> {
             .expect("No vertex format specified for RenderGroup.");
 
         let render_pipeline_layout =
-            window_state
+            window_state()
                 .device
                 .create_pipeline_layout(&PipelineLayoutDescriptor {
                     label: Some("Render Pipeline Layout"),
@@ -78,7 +74,7 @@ impl<'a> RenderGroupBuilder<'a> {
                     push_constant_ranges: &[],
                 });
 
-        let pipeline = window_state
+        let pipeline = window_state()
             .device
             .create_render_pipeline(&RenderPipelineDescriptor {
                 label: Some("Render Pipeline"),
@@ -94,7 +90,7 @@ impl<'a> RenderGroupBuilder<'a> {
                     entry_point: "fs_main",
                     targets: &[Some(wgpu::ColorTargetState {
                         // 4.
-                        format: window_state.config.format,
+                        format: window_state().config.format,
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -127,91 +123,13 @@ impl<'a> RenderGroupBuilder<'a> {
             });
 
         RenderGroup {
-            depth_texture: texture::Texture::create_depth_texture(
-                &window_state.device,
-                &window_state.config,
-                "depth_texture",
-            ),
             pipeline,
-            objects: HashMap::new(),
-            uniforms: HashMap::new(),
+            uniforms: self.uniform_names,
         }
     }
 }
-
-use crate::engine::render_object::RenderObject;
-use crate::engine::uniform::{Uniform, UniformData};
 
 pub struct RenderGroup {
-    depth_texture: texture::Texture,
-    pipeline: RenderPipeline,
-    pub objects: HashMap<String, RenderObject>,
-    pub uniforms: HashMap<String, Uniform>,
-}
-
-impl RenderGroup {
-    pub fn add_render_object(&mut self) {}
-
-    pub fn get_mut_render_object(&mut self, id: &str) -> Option<&mut RenderObject> {
-        self.objects.get_mut(id)
-    }
-
-    pub fn render(&self, window_state: &WindowState) -> Result<(), SurfaceError> {
-        let output = window_state.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&TextureViewDescriptor::default());
-        let mut encoder = window_state
-            .device
-            .create_command_encoder(&CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(wgpu::Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.3,
-                            a: 1.0,
-                        }),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture.view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: true,
-                    }),
-                    stencil_ops: None,
-                }),
-            });
-
-            render_pass.set_pipeline(&self.pipeline);
-
-            for uniform in self.uniforms.values().into_iter() {
-                let Uniform {
-                    location,
-                    bind_group,
-                    data: _,
-                } = uniform;
-
-                render_pass.set_bind_group(*location, &bind_group, &[]);
-            }
-
-            for object in self.objects.values().into_iter() {
-                object.render(&mut render_pass);
-            }
-        }
-        window_state.queue.submit(std::iter::once(encoder.finish()));
-        output.present();
-
-        Ok(())
-    }
+    pub pipeline: RenderPipeline,
+    pub uniforms: Vec<String>,
 }
