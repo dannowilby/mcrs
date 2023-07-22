@@ -1,34 +1,10 @@
 use std::collections::HashMap;
 
 use crate::engine::renderer::Renderer;
-use crate::engine::{render_group::RenderGroup, render_object::RenderObject};
-use crate::window::WindowState;
+use crate::window_state_mut;
+use winit::dpi::PhysicalSize;
 
-type EntityId = String;
-
-// singleton components
-pub struct World {}
-
-// component storages
-#[derive(Default)]
-pub struct Components {}
-
-// system needed parameters:
-// components, queue, renderer, world
-type System = fn(&mut Renderer, &mut Components, &mut World, &mut Vec<Event>);
-
-#[derive(Default)]
-pub struct Systems(HashMap<Event, Vec<System>>);
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum Event {
-    Tick,
-    Render,
-
-    Init,
-}
-
-// S = state
+// D = game data
 // E = event enum: hashable
 pub struct GameState<D, E>
 where
@@ -55,6 +31,11 @@ where
         }
     }
 
+    pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
+        self.renderer.resize();
+        window_state_mut().resize(new_size);
+    }
+
     pub fn add_system(&mut self, event: E, system: fn(&mut Renderer, &mut D, &mut Vec<E>)) {
         self.systems
             .entry(event)
@@ -62,6 +43,7 @@ where
             .or_insert(vec![system]);
     }
 
+    // update
     pub fn process_events(&mut self) {
         while let Some(event) = self.queue[self.plex].pop() {
             for system in self.systems.get(&event).unwrap().iter() {

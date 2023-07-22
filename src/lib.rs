@@ -3,8 +3,10 @@ use winit::{event::*, event_loop::EventLoop, window::WindowBuilder};
 
 mod camera;
 mod engine;
-// mod state;
+mod state;
 mod window;
+mod world;
+use crate::engine::game_state::GameState;
 use crate::engine::new_renderer_full;
 use crate::window::WindowState;
 
@@ -43,6 +45,7 @@ pub fn window_state_mut<'a>() -> &'a mut WindowState {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub async fn run() {
+    // set logging
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -52,12 +55,14 @@ pub async fn run() {
         }
     }
 
+    // init window
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     init_window_state(window).await;
-    let mut renderer = new_renderer_full().await;
 
-    // let state = state::State::default();
+    // init game logic
+    let mut renderer = new_renderer_full().await;
+    // let state = state::GameState::<(), ()>::new(renderer, ());
 
     #[cfg(target_arch = "wasm32")]
     {
@@ -78,33 +83,30 @@ pub async fn run() {
             .expect("Couldn't append canvas to document body.");
     }
 
-    // let mut window_state = window::WindowState::new(window).await;
-    // let mut render_group = test_render_initialization(&window_state).await;
-    /*
-    use crate::engine::renderer::RenderGroupBuilder;
-    let render_group = RenderGroupBuilder::new().build();
-    render_group.add_render_object();
-    */
-
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             window_id,
             ref event,
         } if window_id == window_state().window().id() => {
-            // ecs.eval_input(event);
+            // state.process_events();
+
             if true {
                 // !window_state.input(event) {
                 match event {
                     WindowEvent::CloseRequested => control_flow.set_exit(),
                     WindowEvent::Resized(physical_size) => {
-                        // ecs.dispatch("resize", physical_size);
                         window_state_mut().resize(*physical_size);
                         renderer.resize();
+
+                        // game state resize
+
                         // todo!();
                     }
                     WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                         // new_inner_size is &&mut so we have to dereference it twice
-                        // ecs.dispatch("resize", **new_inner_size);
+
+                        // game state resize
+
                         window_state_mut().resize(**new_inner_size);
                     }
                     _ => {}
@@ -119,9 +121,11 @@ pub async fn run() {
                 // Reconfigure the surface if lost
                 Err(wgpu::SurfaceError::Lost) => {
                     let size = window_state().size;
-                    // ecs.dispatch("resize", window_state.size);
+
                     window_state_mut().resize(size);
                     renderer.resize();
+
+                    // game state resize
                 }
                 // The system is out of memory, we should probably quit
                 Err(wgpu::SurfaceError::OutOfMemory) => control_flow.set_exit(),
