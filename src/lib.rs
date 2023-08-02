@@ -2,12 +2,10 @@ use winit::window::Window;
 use winit::{event::*, event_loop::EventLoop, window::WindowBuilder};
 
 mod camera;
+mod chunk;
 mod engine;
-mod state;
 mod window;
 mod world;
-use crate::engine::game_state::GameState;
-use crate::engine::new_renderer_full;
 use crate::window::WindowState;
 
 #[cfg(target_arch = "wasm32")]
@@ -61,7 +59,7 @@ pub async fn run() {
     init_window_state(window).await;
 
     // init game logic
-    let mut renderer = new_renderer_full().await;
+    let mut game_state = world::init();
     // let state = state::GameState::<(), ()>::new(renderer, ());
 
     #[cfg(target_arch = "wasm32")]
@@ -83,59 +81,45 @@ pub async fn run() {
             .expect("Couldn't append canvas to document body.");
     }
 
+    let mut now = instant::now();
+
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             window_id,
             ref event,
         } if window_id == window_state().window().id() => {
-            // state.process_events();
+            // calc frame delta
 
             if true {
                 // !window_state.input(event) {
                 match event {
                     WindowEvent::CloseRequested => control_flow.set_exit(),
-                    WindowEvent::Resized(physical_size) => {
-                        window_state_mut().resize(*physical_size);
-                        renderer.resize();
-
-                        // game state resize
-
-                        // todo!();
-                    }
+                    WindowEvent::Resized(physical_size) => game_state.resize(*physical_size),
                     WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        // new_inner_size is &&mut so we have to dereference it twice
-
-                        // game state resize
-
-                        window_state_mut().resize(**new_inner_size);
+                        game_state.resize(**new_inner_size)
                     }
                     _ => {}
                 }
             }
         }
         Event::RedrawRequested(window_id) if window_id == window_state().window().id() => {
-            // window_state.update();
-            // ecs.process_events();
-            match renderer.render() {
+            game_state.data.delta = instant::now() - now;
+            now = instant::now();
+
+            game_state.process_events();
+            game_state.queue_event(world::Event::Tick);
+
+            match game_state.renderer.render() {
                 Ok(_) => {}
-                // Reconfigure the surface if lost
                 Err(wgpu::SurfaceError::Lost) => {
                     let size = window_state().size;
-
-                    window_state_mut().resize(size);
-                    renderer.resize();
-
-                    // game state resize
+                    game_state.resize(size);
                 }
-                // The system is out of memory, we should probably quit
                 Err(wgpu::SurfaceError::OutOfMemory) => control_flow.set_exit(),
-                // All other errors (Outdated, Timeout) should be resolved by the next frame
                 Err(e) => eprintln!("{:?}", e),
             }
         }
         Event::MainEventsCleared => {
-            // RedrawRequested will only trigger once, unless we manually
-            // request it.
             window_state().window().request_redraw();
         }
         _ => {}

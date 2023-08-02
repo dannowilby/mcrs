@@ -1,3 +1,4 @@
+use crate::engine::matrix::Matrix;
 use crate::engine::texture::Texture;
 use wgpu::{BindGroup, BindGroupLayout, Buffer};
 
@@ -5,6 +6,7 @@ use wgpu::{BindGroup, BindGroupLayout, Buffer};
 pub enum UniformData {
     Buffer(Buffer),
     Texture(Texture),
+    Matrix(Matrix),
 }
 
 pub struct Uniform {

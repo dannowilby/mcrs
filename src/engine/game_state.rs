@@ -10,8 +10,8 @@ pub struct GameState<D, E>
 where
     E: PartialEq + Eq + std::hash::Hash,
 {
-    data: D,
-    renderer: Renderer,
+    pub data: D,
+    pub renderer: Renderer,
     systems: HashMap<E, Vec<fn(&mut Renderer, &mut D, &mut Vec<E>)>>,
     queue: [Vec<E>; 2],
     plex: usize,
@@ -54,5 +54,11 @@ where
                 );
             }
         }
+
+        self.plex = 1 - self.plex;
+    }
+
+    pub fn queue_event(&mut self, event: E) {
+        self.queue[self.plex].push(event);
     }
 }

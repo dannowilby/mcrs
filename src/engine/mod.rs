@@ -1,4 +1,5 @@
 pub mod game_state;
+pub mod matrix;
 pub mod render_group;
 pub mod render_object;
 pub mod renderer;
@@ -6,6 +7,8 @@ pub mod resources;
 pub mod texture;
 pub mod uniform;
 
+use glam::Mat4;
+use matrix::Matrix;
 use render_group::RenderGroupBuilder;
 use render_object::RenderObject;
 use renderer::Renderer;
@@ -111,7 +114,9 @@ pub async fn new_renderer_full() -> Renderer {
     let texture_uniform = Texture::load("happy-tree.png")
         .await
         .uniform(&texture_layout);
-    // let matrix_uniform = Matrix::identity();
+
+    let matrix_layout = Matrix::create_layout(1);
+    let matrix_uniform = Matrix::new(Mat4::IDENTITY).uniform(&matrix_layout);
 
     let shader_source = load_string("test_shader.wgsl").await.unwrap();
 
@@ -120,7 +125,7 @@ pub async fn new_renderer_full() -> Renderer {
         RenderGroupBuilder::new()
             .shader(&shader_source)
             .with("texture_atlas", texture_layout)
-            // .with("model", Matrix::uniform_layout(2))
+            .with("model", matrix_layout)
             .vertex_format(vertex_description())
             .build(),
     );
@@ -136,10 +141,12 @@ pub async fn new_renderer_full() -> Renderer {
     // let model_uniform = Matrix::identity();
     let vertices = bytemuck::cast_slice(VERTICES);
     let indices = bytemuck::cast_slice(INDICES);
-    renderer.add_object(
-        chunk_id,
-        RenderObject::new("chunk_render_group", vertices, indices),
-    );
+    renderer
+        .add_object(
+            chunk_id,
+            RenderObject::new("chunk_render_group", vertices, indices),
+        )
+        .set_uniform("model", matrix_uniform);
     // .set_uniform("model", model_uniform);
     /*
         let mut render_object = renderer.get_mut_object(chunkId).unwrap();

@@ -91,7 +91,9 @@ impl Renderer {
 
             // encode the render commands
             for (_id, object) in self.render_objects.iter() {
-                let group = self.render_groups.get(&object.render_group).unwrap();
+                let group = self.render_groups.get(&object.render_group).expect(
+                    "Referenced a render group that does not exist! You are using this wrong!",
+                );
 
                 render_pass.set_pipeline(&group.pipeline);
 
