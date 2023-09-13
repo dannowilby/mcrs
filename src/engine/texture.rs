@@ -62,10 +62,10 @@ impl Texture {
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
@@ -132,7 +132,7 @@ impl Texture {
             layout: device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
-                        binding: location,
+                        binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
                             multisampled: false,
@@ -142,7 +142,7 @@ impl Texture {
                         count: None,
                     },
                     wgpu::BindGroupLayoutEntry {
-                        binding: location + 1,
+                        binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
@@ -161,11 +161,11 @@ impl Texture {
             layout: &layout.layout,
             entries: &[
                 wgpu::BindGroupEntry {
-                    binding: layout.location,
+                    binding: 0,
                     resource: wgpu::BindingResource::TextureView(&self.view),
                 },
                 wgpu::BindGroupEntry {
-                    binding: layout.location + 1,
+                    binding: 1,
                     resource: wgpu::BindingResource::Sampler(&self.sampler),
                 },
             ],

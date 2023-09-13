@@ -4,8 +4,10 @@ use winit::{event::*, event_loop::EventLoop, window::WindowBuilder};
 mod camera;
 mod chunk;
 mod engine;
+mod player;
 mod window;
 mod world;
+use crate::engine::game_state;
 use crate::window::WindowState;
 
 #[cfg(target_arch = "wasm32")]
@@ -59,7 +61,7 @@ pub async fn run() {
     init_window_state(window).await;
 
     // init game logic
-    let mut game_state = world::init();
+    let mut game_state = world::init().await;
     // let state = state::GameState::<(), ()>::new(renderer, ());
 
     #[cfg(target_arch = "wasm32")]
@@ -81,8 +83,6 @@ pub async fn run() {
             .expect("Couldn't append canvas to document body.");
     }
 
-    let mut now = instant::now();
-
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             window_id,
@@ -90,21 +90,33 @@ pub async fn run() {
         } if window_id == window_state().window().id() => {
             // calc frame delta
 
+            game_state.input.handle(event);
+
             if true {
                 // !window_state.input(event) {
                 match event {
                     WindowEvent::CloseRequested => control_flow.set_exit(),
-                    WindowEvent::Resized(physical_size) => game_state.resize(*physical_size),
+                    WindowEvent::Resized(physical_size) => {
+                        game_state.resize(*physical_size);
+                        game_state.queue_event(world::Event::Resized);
+                    }
                     WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        game_state.resize(**new_inner_size)
+                        game_state.resize(**new_inner_size);
+                        game_state.queue_event(world::Event::Resized);
                     }
                     _ => {}
                 }
             }
         }
+        Event::DeviceEvent {
+            event: DeviceEvent::MouseMotion { delta },
+            ..
+        } => {
+            game_state.input.mouse_delta(delta);
+        }
         Event::RedrawRequested(window_id) if window_id == window_state().window().id() => {
-            game_state.data.delta = instant::now() - now;
-            now = instant::now();
+            game_state.delta_end();
+            game_state.delta_start();
 
             game_state.process_events();
             game_state.queue_event(world::Event::Tick);
@@ -114,6 +126,7 @@ pub async fn run() {
                 Err(wgpu::SurfaceError::Lost) => {
                     let size = window_state().size;
                     game_state.resize(size);
+                    game_state.queue_event(world::Event::Resized);
                 }
                 Err(wgpu::SurfaceError::OutOfMemory) => control_flow.set_exit(),
                 Err(e) => eprintln!("{:?}", e),

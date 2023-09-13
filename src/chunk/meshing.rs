@@ -10,9 +10,9 @@ use super::{ChunkConfig, ChunkPos};
 #[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C)]
 pub struct Vertex {
-    position: [f32; 3],
-    uv: [f32; 2],
-    ao: f32,
+    pub position: [f32; 3],
+    pub uv: [f32; 2],
+    pub ao: f32,
 }
 
 impl Vertex {
@@ -52,6 +52,7 @@ pub fn mesh_chunk(
 ) -> RenderObject {
     let mut vertices = Vec::<Vertex>::new();
     let mut indices = Vec::<u16>::new();
+    let mut last_index = 0;
 
     // loop over all blocks in chunk
     for (position, block_id) in chunk_data.iter() {
@@ -65,9 +66,16 @@ pub fn mesh_chunk(
 
         let block = dict.get(block_id);
         let model = block.map(|b| b.model).unwrap_or(Block::default().model);
-        let (mut verts, mut inds) = model(config, loaded_chunks, &block_world_position);
+        let (mut verts, mut inds) = model(
+            config,
+            loaded_chunks,
+            dict,
+            &block_world_position,
+            last_index,
+        );
         vertices.append(&mut verts);
         indices.append(&mut inds);
+        last_index = vertices.len() as u16;
 
         // calc faces to add to mesh
 
@@ -75,31 +83,8 @@ pub fn mesh_chunk(
     }
 
     RenderObject::new(
-        "chunk_bind_group",
+        "chunk_render_group",
         bytemuck::cast_slice(vertices.as_slice()),
         bytemuck::cast_slice(indices.as_slice()),
     )
-}
-
-// return the faces (vertices, indices) for the block
-pub fn cube_model(
-    chunk_config: &ChunkConfig,
-    loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
-    position: &(u32, u32, u32),
-) -> (Vec<Vertex>, Vec<u16>) {
-    let mut vertices = Vec::new();
-    let mut indices = Vec::new();
-
-    let (p0, p1, p2) = position;
-
-    let tb = dict
-        .get(&get_block(chunk_config, loaded_chunks, &(*p0, p1 + 1, *p2)))
-        .map_or(true, |b| b.transparent);
-    if tb {
-        // vertices.append();
-        // indices.append()
-    }
-
-    (vertices, indices)
 }

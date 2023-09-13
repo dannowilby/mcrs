@@ -2,10 +2,11 @@ use noise::NoiseFn;
 use std::collections::HashMap;
 
 pub mod block;
+pub mod cube_model;
 pub mod generation;
 pub mod meshing;
 
-pub type ChunkPos = (u32, u32, u32);
+pub type ChunkPos = (i32, i32, i32);
 pub type ChunkData = HashMap<ChunkPos, u32>;
 
 pub struct ChunkConfig {
@@ -14,14 +15,45 @@ pub struct ChunkConfig {
     // squish bias
     pub noise: Box<dyn NoiseFn<f64, 3>>, // chunk size?
     pub noise_amplitude: (f64, f64, f64),
-    pub depth: u32,
+    pub depth: i32,
+
+    pub uv_size: f32,
+}
+
+fn get_local_block_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
+    let size = chunk_config.depth;
+    ((pos % size) + size) % size
+}
+
+fn get_chunk_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
+    (pos as f32 / chunk_config.depth as f32).floor() as i32
 }
 
 pub fn get_block(
     chunk_config: &ChunkConfig,
     loaded_chunks: &HashMap<String, ChunkData>,
-    raw_position: &(u32, u32, u32),
+    raw_position: &(i32, i32, i32),
 ) -> u32 {
+    let chunk_pos = format!(
+        "chunk-{}-{}-{}",
+        get_chunk_pos(chunk_config, raw_position.0),
+        get_chunk_pos(chunk_config, raw_position.1),
+        get_chunk_pos(chunk_config, raw_position.2),
+    );
+    let chunk_query = loaded_chunks.get(&chunk_pos);
+    if let Some(chunk_data) = chunk_query {
+        let block_pos = (
+            get_local_block_pos(chunk_config, raw_position.0),
+            get_local_block_pos(chunk_config, raw_position.1),
+            get_local_block_pos(chunk_config, raw_position.2),
+        );
+        let block = chunk_data.get(&block_pos);
+
+        if let Some(block_id) = block {
+            return *block_id;
+        }
+    }
+
     0
 }
 

@@ -49,6 +49,10 @@ impl Renderer {
         self.uniforms.insert(uniform_name.to_owned(), uniform);
     }
 
+    pub fn get_global_uniform(&mut self, uniform_name: &str) -> Option<&mut Uniform> {
+        self.uniforms.get_mut(uniform_name)
+    }
+
     pub fn render(&self) -> Result<(), wgpu::SurfaceError> {
         let device = &window_state().device;
         let surface = &window_state().surface;

@@ -43,7 +43,7 @@ impl Matrix {
         UniformLayout {
             layout: device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: location,
+                    binding: 0,
                     visibility: wgpu::ShaderStages::VERTEX,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -63,7 +63,7 @@ impl Matrix {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &layout.layout,
             entries: &[wgpu::BindGroupEntry {
-                binding: layout.location,
+                binding: 0,
                 resource: self.buffer.as_entire_binding(),
             }],
             label: Some("matrix_bind_group"),
