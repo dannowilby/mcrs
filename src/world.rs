@@ -66,7 +66,7 @@ fn load_world(
     //
 
     for x in -2..3 {
-        for y in -2..3 {
+        for y in -2..4 {
             for z in -2..3 {
                 let chunk_pos = (x, y, z);
                 let chunk_id = format!("chunk-{}-{}-{}", x, y, z);
@@ -146,6 +146,15 @@ pub async fn init() -> GameState<GameData, Event> {
                         transparent: false,
                         ident: "stone".to_owned(),
                         uv: [0.0625, 0.0],
+                    },
+                ),
+                (
+                    3,
+                    Block {
+                        model: cube_model,
+                        transparent: false,
+                        ident: "dirt".to_owned(),
+                        uv: [0.125, 0.0],
                     },
                 ),
             ]),

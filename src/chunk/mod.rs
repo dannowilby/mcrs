@@ -5,6 +5,7 @@ pub mod block;
 pub mod cube_model;
 pub mod generation;
 pub mod meshing;
+use block::BlockDictionary;
 
 pub type ChunkPos = (i32, i32, i32);
 pub type ChunkData = HashMap<ChunkPos, u32>;
@@ -29,13 +30,27 @@ fn get_chunk_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
     (pos as f32 / chunk_config.depth as f32).floor() as i32
 }
 
+pub fn chunk_id(x: i32, y: i32, z: i32) -> String {
+    format!("chunk-{}-{}-{}", x, y, z)
+}
+
+pub fn is_transparent(
+    chunk_config: &ChunkConfig,
+    loaded_chunks: &HashMap<String, ChunkData>,
+    dict: &BlockDictionary,
+    position: &(i32, i32, i32),
+) -> bool {
+    let (p0, p1, p2) = position;
+    dict.get(&get_block(chunk_config, loaded_chunks, &(*p0, p1 + 1, *p2)))
+        .map_or(true, |b| b.transparent)
+}
+
 pub fn get_block(
     chunk_config: &ChunkConfig,
     loaded_chunks: &HashMap<String, ChunkData>,
     raw_position: &(i32, i32, i32),
 ) -> u32 {
-    let chunk_pos = format!(
-        "chunk-{}-{}-{}",
+    let chunk_pos = chunk_id(
         get_chunk_pos(chunk_config, raw_position.0),
         get_chunk_pos(chunk_config, raw_position.1),
         get_chunk_pos(chunk_config, raw_position.2),

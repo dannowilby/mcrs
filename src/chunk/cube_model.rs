@@ -1,16 +1,7 @@
 use crate::chunk::{block::BlockDictionary, get_block, meshing::Vertex, ChunkConfig, ChunkData};
 use std::collections::HashMap;
 
-pub fn is_transparent(
-    chunk_config: &ChunkConfig,
-    loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
-    position: &(i32, i32, i32),
-) -> bool {
-    let (p0, p1, p2) = position;
-    dict.get(&get_block(chunk_config, loaded_chunks, &(*p0, p1 + 1, *p2)))
-        .map_or(true, |b| b.transparent)
-}
+use super::is_transparent;
 
 fn ao(
     chunk_config: &ChunkConfig,
