@@ -16,6 +16,7 @@ pub struct Player {
     pub fov: f32,
     move_speed: f32,
     sensitivity: f32,
+    pub load_radius: u32,
 }
 
 impl Player {
@@ -27,6 +28,7 @@ impl Player {
             fov: 1.0472,
             move_speed: 0.01,
             sensitivity: 0.2,
+            load_radius: 4,
         }
     }
 }

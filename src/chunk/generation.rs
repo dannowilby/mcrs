@@ -136,14 +136,14 @@ pub fn generate_foliage(
 
     // if chunk is less than ground level
     // then don't add grass/dirt/etc...
-    if pos.1 < 0 {
-        return;
-    }
+    // new feature idea: might look cooler if we don't do this
+    // if pos.1 < 0 {
+    //    return;
+    // }
 
     for x in 0..config.depth {
         for z in 0..config.depth {
             if let Some(y) = get_local_height(config, dict, loaded_chunks, data, pos, x, z) {
-                println!("{}", y);
                 // add dirt
                 for i in 1..4 {
                     data.insert((x, (y - i).max(0), z), 3);

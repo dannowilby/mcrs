@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use winit::event::VirtualKeyCode;
 
 use crate::chunk::block::{Block, BlockDictionary};
+use crate::chunk::chunk_id;
 use crate::chunk::cube_model::cube_model;
+use crate::chunk::get_chunk_pos;
 use crate::chunk::meshing;
 use crate::chunk::meshing::mesh_chunk;
 use crate::chunk::{calc_lod, ChunkConfig, ChunkData};
@@ -65,12 +67,26 @@ fn load_world(
     */
     //
 
-    for x in -2..3 {
-        for y in -2..4 {
-            for z in -2..3 {
+    let (player_i, player_j, player_k) = data.player.position;
+    let i = get_chunk_pos(&data.chunk_config, player_i.floor() as i32);
+    let j = get_chunk_pos(&data.chunk_config, player_j.floor() as i32);
+    let k = get_chunk_pos(&data.chunk_config, player_k.floor() as i32);
+    let radius = data.player.load_radius as i32;
+
+    let mut keys: Vec<String> = data.loaded_chunks.iter().map(|(k, v)| k.clone()).collect();
+
+    for x in (i - radius)..(i + radius) {
+        for y in (j - radius)..(j + radius) {
+            for z in (k - radius)..(k + radius) {
                 let chunk_pos = (x, y, z);
-                let chunk_id = format!("chunk-{}-{}-{}", x, y, z);
+                let chunk_id = chunk_id(x, y, z);
                 let lod = calc_lod();
+
+                if data.loaded_chunks.contains_key(&chunk_id) {
+                    let index = keys.iter().position(|s| s == (&chunk_id)).unwrap();
+                    keys.swap_remove(index);
+                    continue;
+                }
 
                 let chunk = load_chunk(
                     &data.loaded_chunks,
@@ -78,16 +94,21 @@ fn load_world(
                     &data.chunk_config,
                     &chunk_pos,
                 );
-                data.loaded_chunks.insert(chunk_id.clone(), chunk.clone());
+                data.loaded_chunks.insert(chunk_id.clone(), chunk);
             }
         }
     }
-    for x in -2..3 {
-        for y in -2..3 {
-            for z in -2..3 {
+    for x in (i - radius)..(i + radius) {
+        for y in (j - radius)..(j + radius) {
+            for z in (k - radius)..(k + radius) {
                 let chunk_pos = (x, y, z);
-                let chunk_id = format!("chunk-{}-{}-{}", x, y, z);
+                let chunk_id = chunk_id(x, y, z);
                 let lod = calc_lod();
+
+                if let Some(_) = renderer.get_mut_object(&chunk_id) {
+                    continue;
+                }
+
                 let chunk = data.loaded_chunks.get(&chunk_id).unwrap();
                 let mesh = mesh_chunk(
                     &data.loaded_chunks,
@@ -109,6 +130,12 @@ fn load_world(
                     .set_uniform("model", mat);
             }
         }
+    }
+
+    for c in keys.iter() {
+        println!("removing: {}", c);
+        data.loaded_chunks.remove(c);
+        renderer.remove_object(c);
     }
 }
 
@@ -206,27 +233,11 @@ pub async fn init() -> GameState<GameData, Event> {
     // game_state.add_system(Event::Tick, cursor_lock);
 
     game_state.add_system(Event::PlayerMoved, update_camera);
+    game_state.add_system(Event::PlayerMoved, load_world);
     game_state.add_system(Event::Resized, update_perspective);
 
     game_state.queue_event(Event::Init);
     game_state
-}
-
-fn cursor_lock(
-    renderer: &mut Renderer,
-    input: &mut Input,
-    data: &mut GameData,
-    queue: &mut Vec<Event>,
-    delta: f64,
-) {
-    println!("{}, {}", input.movement.0, input.movement.1);
-    /*
-    let window = &window_state().window;
-    window
-        .set_cursor_grab(winit::window::CursorGrabMode::Confined)
-        .unwrap_or_default();
-    window.set_cursor_visible(false);
-    */
 }
 
 fn track_time(

@@ -26,7 +26,7 @@ fn get_local_block_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
     ((pos % size) + size) % size
 }
 
-fn get_chunk_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
+pub fn get_chunk_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
     (pos as f32 / chunk_config.depth as f32).floor() as i32
 }
 

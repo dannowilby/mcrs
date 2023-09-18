@@ -24,6 +24,7 @@ anyhow = "1.0"
 glam = { version = "0.24", default-features = false, features = ["libm"] }
 instant = "0.1"
 noise = "0.8"
+rayon = "1.7.0"
 
 [dependencies.image]
 version = "0.24.6"
