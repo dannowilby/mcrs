@@ -14,11 +14,13 @@ pub struct ChunkConfig {
     // initialized noise function
     // height bias
     // squish bias
-    pub noise: Box<dyn NoiseFn<f64, 3>>, // chunk size?
+    pub noise: fn([f64; 3]) -> f64, // chunk size?
     pub noise_amplitude: (f64, f64, f64),
     pub depth: i32,
 
     pub uv_size: f32,
+
+    pub dict: BlockDictionary,
 }
 
 fn get_local_block_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {

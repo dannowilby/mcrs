@@ -5,6 +5,7 @@ use crate::window_state;
 
 use super::uniform::{Uniform, UniformLayout};
 
+#[derive(Debug)]
 pub struct Matrix {
     data: Mat4,
     buffer: Buffer,

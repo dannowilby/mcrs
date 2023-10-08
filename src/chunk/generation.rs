@@ -80,25 +80,19 @@ pub fn ground_threshold(config: &ChunkConfig, pos: i32) -> f64 {
 
 // could abstract out the generating functions
 // would just overcomplicate things at the moment
-pub fn generate(
-    loaded_chunks: &HashMap<String, HashMap<(i32, i32, i32), u32>>,
-    dict: &BlockDictionary,
-    config: &ChunkConfig,
-    pos: &ChunkPos,
-) -> ChunkData {
+pub fn generate(config: &ChunkConfig, pos: &ChunkPos) -> ChunkData {
     let mut output = ChunkData::new();
-    generate_terrain(loaded_chunks, dict, config, pos, &mut output);
-    generate_foliage(loaded_chunks, dict, config, pos, &mut output);
+    generate_terrain(config, pos, &mut output);
+    // generate_foliage(config, pos, &mut output);
     // generate ores
     // generate structures
 
     output
 }
 
+/*
 fn get_local_height(
     config: &ChunkConfig,
-    dict: &BlockDictionary,
-    loaded_chunks: &HashMap<String, HashMap<(i32, i32, i32), u32>>,
     data: &ChunkData,
     pos: &ChunkPos,
     x: i32,
@@ -125,13 +119,8 @@ fn get_local_height(
     None
 }
 
-pub fn generate_foliage(
-    loaded_chunks: &HashMap<String, HashMap<(i32, i32, i32), u32>>,
-    dict: &BlockDictionary,
-    config: &ChunkConfig,
-    pos: &ChunkPos,
-    data: &mut ChunkData,
-) {
+
+pub fn generate_foliage(config: &ChunkConfig, pos: &ChunkPos, data: &mut ChunkData) {
     // get height
 
     // if chunk is less than ground level
@@ -163,14 +152,9 @@ pub fn generate_foliage(
     // else
     // underground foliage
 }
+    */
 
-pub fn generate_terrain(
-    loaded_chunks: &HashMap<String, HashMap<(i32, i32, i32), u32>>,
-    dict: &BlockDictionary,
-    config: &ChunkConfig,
-    pos: &ChunkPos,
-    output: &mut ChunkData,
-) {
+pub fn generate_terrain(config: &ChunkConfig, pos: &ChunkPos, output: &mut ChunkData) {
     for x in 0..config.depth {
         for y in 0..config.depth {
             for z in 0..config.depth {
@@ -187,7 +171,7 @@ pub fn generate_terrain(
                     config.noise_amplitude.2 * global_position[2] as f64,
                 ];
                 let noise =
-                    config.noise.get(noise_position) + ground_threshold(config, global_position[1]);
+                    (config.noise)(noise_position) + ground_threshold(config, global_position[1]);
 
                 if noise < 0.0 {
                     output.insert(position, 2);
@@ -197,15 +181,10 @@ pub fn generate_terrain(
     }
 }
 
-pub fn load_chunk(
-    loaded_chunks: &HashMap<String, HashMap<(i32, i32, i32), u32>>,
-    dict: &BlockDictionary,
-    config: &ChunkConfig,
-    pos: &ChunkPos,
-) -> ChunkData {
+pub fn load_chunk(config: &ChunkConfig, pos: &ChunkPos) -> ChunkData {
     // load chuhnk from fs
 
     // if no chunk data found,
     // generate chunk
-    generate(loaded_chunks, dict, config, pos)
+    generate(config, pos)
 }

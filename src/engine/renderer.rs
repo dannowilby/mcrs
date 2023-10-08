@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::sync::Arc;
+use std::{collections::HashMap, sync::RwLock};
 
 use crate::window_state;
 
@@ -30,19 +31,27 @@ impl Renderer {
     }
 
     // should always return a valid reference, panic if None is found
-    pub fn add_object<'a>(&'a mut self, id: &str, object: RenderObject) -> &'a mut RenderObject {
+    pub fn add_object(&mut self, id: &str, object: RenderObject) {
         self.render_objects.insert(id.to_owned(), object);
-        self.render_objects.get_mut(id).unwrap()
     }
 
-    #[allow(dead_code)]
     pub fn remove_object(&mut self, id: &str) -> Option<RenderObject> {
         self.render_objects.remove(id)
     }
 
-    #[allow(dead_code)]
-    pub fn get_mut_object(&mut self, id: &str) -> Option<&mut RenderObject> {
-        self.render_objects.get_mut(id)
+    pub fn set_object_uniform(&mut self, id: &str, uniform_name: &str, uniform: Uniform) {
+        self.render_objects
+            .get_mut(id)
+            .unwrap()
+            .set_uniform(uniform_name, uniform);
+    }
+
+    pub fn contains_object(&self, id: &str) -> bool {
+        self.render_objects.contains_key(id)
+    }
+
+    pub fn get_mut_object<'a>(&'a mut self, id: &str) -> &'a mut RenderObject {
+        self.render_objects.get_mut(id).unwrap()
     }
 
     pub fn set_global_uniform(&mut self, uniform_name: &str, uniform: Uniform) {

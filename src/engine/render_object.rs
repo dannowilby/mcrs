@@ -4,6 +4,7 @@ use wgpu::Buffer;
 use crate::engine::uniform::Uniform;
 use crate::window_state;
 
+#[derive(Debug)]
 pub struct RenderObject {
     pub render_group: String,
     pub vertex_buffer: Buffer,

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 use crate::engine::input::Input;
 use crate::engine::renderer::Renderer;
@@ -8,14 +9,14 @@ use winit::event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode, Win
 
 // D = game data
 // E = event enum: hashable
-pub type System<D, E> = fn(&mut Renderer, &mut Input, &mut D, &mut Vec<E>, f64);
+pub type System<D, E> = fn(Arc<RwLock<Renderer>>, &mut Input, &mut D, &mut Vec<E>, f64);
 
 pub struct GameState<D, E>
 where
     E: PartialEq + Eq + std::hash::Hash,
 {
     pub data: D,
-    pub renderer: Renderer,
+    pub renderer: Arc<RwLock<Renderer>>,
     systems: HashMap<E, Vec<System<D, E>>>,
     queue: [Vec<E>; 2],
     plex: usize,
@@ -32,7 +33,7 @@ where
         Self {
             data,
             systems: Default::default(),
-            renderer,
+            renderer: Arc::new(RwLock::new(renderer)),
             queue: Default::default(),
             plex: 0,
             delta: 0.0,
@@ -46,7 +47,7 @@ where
     // might want to change and just pass directly in the future
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         window_state_mut().resize(new_size);
-        self.renderer.resize();
+        self.renderer.write().unwrap().resize();
     }
 
     pub fn add_system(&mut self, event: E, system: System<D, E>) {
@@ -62,7 +63,7 @@ where
             if let Some(system) = self.systems.get(&event) {
                 for system in system.iter() {
                     system(
-                        &mut self.renderer,
+                        self.renderer.clone(),
                         &mut self.input,
                         &mut self.data,
                         &mut self.queue[1 - self.plex],

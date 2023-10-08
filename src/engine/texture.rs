@@ -9,6 +9,7 @@ use crate::{
     window_state,
 };
 
+#[derive(Debug)]
 pub struct Texture {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,

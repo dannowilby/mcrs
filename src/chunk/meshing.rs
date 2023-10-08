@@ -1,9 +1,10 @@
 use std::collections::HashMap;
+use std::sync::RwLock;
 use wgpu::VertexBufferLayout;
 
 use super::super::engine::render_object::RenderObject;
 use super::block::{Block, BlockDictionary};
-use super::LOD;
+use super::{chunk_id, LOD};
 use super::{get_block, ChunkData};
 use super::{ChunkConfig, ChunkPos};
 
@@ -42,12 +43,11 @@ impl Vertex {
     }
 }
 
+// see what's taking so long in this function/and why
 pub fn mesh_chunk(
     loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
     config: &ChunkConfig,
     chunk_pos: &ChunkPos,
-    chunk_data: &ChunkData,
     lod: LOD,
 ) -> RenderObject {
     let mut vertices = Vec::<Vertex>::new();
@@ -55,7 +55,8 @@ pub fn mesh_chunk(
     let mut last_index = 0;
 
     // loop over all blocks in chunk
-    for (position, block_id) in chunk_data.iter() {
+    let chunk_id = chunk_id(chunk_pos.0, chunk_pos.1, chunk_pos.2);
+    for (position, block_id) in loaded_chunks.get(&chunk_id).unwrap().iter() {
         // ideally, we want to change the mesh/vertex attributes
         // based on the surrounding blocks
         let block_world_position = (
@@ -64,15 +65,9 @@ pub fn mesh_chunk(
             chunk_pos.2 * config.depth + position.2,
         );
 
-        let block = dict.get(block_id);
+        let block = config.dict.get(block_id);
         let model = block.map(|b| b.model).unwrap_or(Block::default().model);
-        let (mut verts, mut inds) = model(
-            config,
-            loaded_chunks,
-            dict,
-            &block_world_position,
-            last_index,
-        );
+        let (mut verts, mut inds) = model(loaded_chunks, config, &block_world_position, last_index);
         vertices.append(&mut verts);
         indices.append(&mut inds);
         last_index = vertices.len() as u16;

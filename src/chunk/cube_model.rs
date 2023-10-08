@@ -1,5 +1,6 @@
 use crate::chunk::{block::BlockDictionary, get_block, meshing::Vertex, ChunkConfig, ChunkData};
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 use super::is_transparent;
 
@@ -26,15 +27,15 @@ fn ao(
 // return the faces (vertices, indices) for the block
 // these types of functions might get pretty nasty
 pub fn cube_model(
-    chunk_config: &ChunkConfig,
     loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
+    chunk_config: &ChunkConfig,
     position: &(i32, i32, i32),
     last_index: u16,
 ) -> (Vec<Vertex>, Vec<u16>) {
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
     let mut local_last_index = last_index;
+    let dict = &chunk_config.dict;
 
     let (p0, p1, p2) = position;
     let block = get_block(chunk_config, loaded_chunks, &position);

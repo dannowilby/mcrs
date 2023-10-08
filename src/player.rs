@@ -8,6 +8,7 @@ use crate::{
     window_state,
     world::{Event, GameData},
 };
+use std::sync::{Arc, RwLock};
 
 pub struct Player {
     pub position: (f32, f32, f32),
@@ -28,14 +29,14 @@ impl Player {
             fov: 1.0472,
             move_speed: 0.01,
             sensitivity: 0.2,
-            load_radius: 4,
+            load_radius: 3,
         }
     }
 }
 
 // camera controller input
 pub fn player_input(
-    renderer: &mut Renderer,
+    renderer: Arc<RwLock<Renderer>>,
     input: &mut Input,
     data: &mut GameData,
     queue: &mut Vec<Event>,
@@ -104,7 +105,7 @@ pub fn player_input(
 // this does the actual updating of the camera buffer
 // the input method just updates the values
 pub fn update_camera(
-    renderer: &mut Renderer,
+    renderer: Arc<RwLock<Renderer>>,
     input: &mut Input,
     data: &mut GameData,
     queue: &mut Vec<Event>,
@@ -113,7 +114,7 @@ pub fn update_camera(
     if let Some(Uniform {
         data: UniformData::Matrix(m),
         ..
-    }) = renderer.get_global_uniform("view")
+    }) = renderer.write().unwrap().get_global_uniform("view")
     {
         let mat = m.matrix();
 
@@ -134,7 +135,7 @@ pub fn update_camera(
 // perspective matrix configuration
 // called on resize
 pub fn update_perspective(
-    renderer: &mut Renderer,
+    renderer: Arc<RwLock<Renderer>>,
     input: &mut Input,
     data: &mut GameData,
     queue: &mut Vec<Event>,
@@ -143,7 +144,7 @@ pub fn update_perspective(
     if let Some(Uniform {
         data: UniformData::Matrix(m),
         ..
-    }) = renderer.get_global_uniform("projection")
+    }) = renderer.write().unwrap().get_global_uniform("projection")
     {
         let config = &window_state().config;
         let mat = m.matrix();
@@ -160,7 +161,7 @@ pub fn update_perspective(
 // check when the player is actively in the window
 // currently ESC backs them out
 pub fn focus_window(
-    renderer: &mut Renderer,
+    renderer: Arc<RwLock<Renderer>>,
     input: &mut Input,
     data: &mut GameData,
     queue: &mut Vec<Event>,

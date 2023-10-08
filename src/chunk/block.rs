@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 use crate::chunk::meshing::Vertex;
 use crate::chunk::ChunkData;
@@ -8,9 +9,8 @@ use super::ChunkConfig;
 pub struct Block {
     // will take in a raw position and chunk data
     pub model: fn(
-        &ChunkConfig,
         &HashMap<String, ChunkData>,
-        &BlockDictionary,
+        &ChunkConfig,
         &(i32, i32, i32),
         u16,
     ) -> (Vec<Vertex>, Vec<u16>),
@@ -22,7 +22,7 @@ pub struct Block {
 impl Default for Block {
     fn default() -> Self {
         Block {
-            model: |_, _, _, _, _| (Vec::new(), Vec::new()),
+            model: |_, _, _, _| (Vec::new(), Vec::new()),
             transparent: true,
             ident: "air".to_owned(),
             uv: [0.0, 0.0],

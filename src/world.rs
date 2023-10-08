@@ -1,5 +1,10 @@
 use noise::{Simplex, Worley};
+use rayon::Scope;
+use rayon::ThreadPoolBuilder;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::RwLock;
 use winit::event::VirtualKeyCode;
 
 use crate::chunk::block::{Block, BlockDictionary};
@@ -13,6 +18,7 @@ use crate::engine::game_state::{self, GameState};
 use crate::engine::input::Input;
 use crate::engine::matrix::Matrix;
 use crate::engine::render_group::RenderGroupBuilder;
+use crate::engine::render_object::RenderObject;
 use crate::engine::renderer::Renderer;
 use crate::engine::resources::load_string;
 use crate::engine::texture;
@@ -33,109 +39,120 @@ pub enum Event {
 
 pub struct GameData {
     // component data
-    loaded_chunks: HashMap<String, ChunkData>,
+    loaded_chunks: Arc<RwLock<HashMap<String, ChunkData>>>,
 
     // singleton data
-    chunk_config: ChunkConfig,
-    block_dictionary: BlockDictionary,
+    chunk_config: Arc<ChunkConfig>,
     pub player: Player,
     time: f64,
     frames: f64,
     pub focused: bool,
 }
 
-// pseudocode atm
+// TODO:
+// - offload chunk loading onto a separate thread
+// - improve terrain generation
+//   - be able to query for a block position, just for the terrain
+// - maybe create new event for when a player moves chunk to load
+// TODO (stetch):
+// - Frustrum culling
+// - Occulsion culling
 fn load_world(
-    renderer: &mut Renderer,
+    renderer: Arc<RwLock<Renderer>>,
     input: &mut Input,
     data: &mut GameData,
     queue: &mut Vec<Event>,
     delta: f64,
 ) {
-    /*
-    // this shouldn't be bad to parallelize
-    for (x, y, z) in player_chunk_radius {
-        let chunk_id = "";
-        let lod = calc_lod(player, (x, y, z));
-
-        data.chunk_data[chunk_id] = generate(x, y, z);
-
-        let (mesh_vertices, mesh_indices) = generate_mesh(data.chunk_data, lod);
-        renderer.add_object(chunk_id).set_uniform();
-        data.meshes[chunk_id] = chunk_id;
-    }
-    */
-    //
-
+    // chunk loading dimensions
     let (player_i, player_j, player_k) = data.player.position;
     let i = get_chunk_pos(&data.chunk_config, player_i.floor() as i32);
     let j = get_chunk_pos(&data.chunk_config, player_j.floor() as i32);
     let k = get_chunk_pos(&data.chunk_config, player_k.floor() as i32);
     let radius = data.player.load_radius as i32;
 
-    let mut keys: Vec<String> = data.loaded_chunks.iter().map(|(k, v)| k.clone()).collect();
+    let mut chunks_to_load = Vec::new();
+    let mut chunks_to_remove: Vec<String> = data
+        .loaded_chunks
+        .read()
+        .unwrap()
+        .iter()
+        .map(|(k, v)| k.clone())
+        .collect();
 
+    // calculate chunks to modify
     for x in (i - radius)..(i + radius) {
         for y in (j - radius)..(j + radius) {
             for z in (k - radius)..(k + radius) {
-                let chunk_pos = (x, y, z);
                 let chunk_id = chunk_id(x, y, z);
-                let lod = calc_lod();
 
-                if data.loaded_chunks.contains_key(&chunk_id) {
-                    let index = keys.iter().position(|s| s == (&chunk_id)).unwrap();
-                    keys.swap_remove(index);
-                    continue;
+                let index = chunks_to_remove.iter().position(|r| r == &chunk_id);
+                if let Some(x) = index {
+                    chunks_to_remove.swap_remove(x);
                 }
 
-                let chunk = load_chunk(
-                    &data.loaded_chunks,
-                    &data.block_dictionary,
-                    &data.chunk_config,
-                    &chunk_pos,
-                );
-                data.loaded_chunks.insert(chunk_id.clone(), chunk);
+                // if loaded chunks doesn't contain it, but it should
+                if !data.loaded_chunks.read().unwrap().contains_key(&chunk_id) {
+                    chunks_to_load.push((chunk_id, (x, y, z)));
+                }
             }
         }
     }
-    for x in (i - radius)..(i + radius) {
-        for y in (j - radius)..(j + radius) {
-            for z in (k - radius)..(k + radius) {
-                let chunk_pos = (x, y, z);
-                let chunk_id = chunk_id(x, y, z);
-                let lod = calc_lod();
 
-                if let Some(_) = renderer.get_mut_object(&chunk_id) {
-                    continue;
-                }
+    let thread_pool = ThreadPoolBuilder::new().num_threads(16).build().unwrap();
 
-                let chunk = data.loaded_chunks.get(&chunk_id).unwrap();
+    // generate all the chunks
+    thread_pool.scope(|scope| {
+        for (chunk_id, chunk_pos) in &chunks_to_load {
+            let config = data.chunk_config.clone();
+            let loaded_chunks = data.loaded_chunks.clone();
+            scope.spawn(move |_| {
+                // load chunk
+                let chunk = load_chunk(&config, &chunk_pos);
+                loaded_chunks
+                    .write()
+                    .unwrap()
+                    .insert(chunk_id.clone(), chunk);
+            });
+        }
+    });
+
+    // mesh all the chunks
+    thread_pool.scope(|scope| {
+        for (chunk_id, chunk_pos) in &chunks_to_load {
+            let config = data.chunk_config.clone();
+            let loaded_chunks = data.loaded_chunks.clone();
+            let renderer = renderer.clone();
+            scope.spawn(move |_| {
+                // meshing takes to long
+                // need to make faster
                 let mesh = mesh_chunk(
-                    &data.loaded_chunks,
-                    &data.block_dictionary,
-                    &data.chunk_config,
+                    &loaded_chunks.read().unwrap(),
+                    &config,
                     &chunk_pos,
-                    &chunk,
-                    lod,
+                    calc_lod(),
                 );
 
+                // add mesh to renderer
                 let mat = Matrix::new(glam::Mat4::from_translation(glam::f32::vec3(
                     0.0, //x as f32 * data.chunk_config.depth as f32,
                     0.0, //y as f32 * data.chunk_config.depth as f32,
                     0.0, //z as f32 * data.chunk_config.depth as f32,
                 )))
                 .uniform(&Matrix::create_layout(2));
+                renderer.write().unwrap().add_object(&chunk_id, mesh);
                 renderer
-                    .add_object(&chunk_id, mesh)
-                    .set_uniform("model", mat);
-            }
+                    .write()
+                    .unwrap()
+                    .set_object_uniform(&chunk_id, "model", mat);
+            })
         }
-    }
+    });
 
-    for c in keys.iter() {
-        println!("removing: {}", c);
-        data.loaded_chunks.remove(c);
-        renderer.remove_object(c);
+    // remove unneeded chunks
+    for c in chunks_to_remove {
+        data.loaded_chunks.write().unwrap().remove(&c);
+        renderer.write().unwrap().remove_object(&c);
     }
 }
 
@@ -147,44 +164,44 @@ pub async fn init() -> GameState<GameData, Event> {
             // chunk_data: HashMap::new(),
             loaded_chunks: Default::default(),
 
-            chunk_config: ChunkConfig {
-                noise: Box::new(Simplex::new(seed)),
-                noise_amplitude: (0.025, 0.025, 0.025),
+            chunk_config: Arc::new(ChunkConfig {
+                noise: |[x, y, z]| f64::sin(x) + f64::sin(y) + f64::sin(z),
+                noise_amplitude: (0.25, 0.25, 0.25),
                 depth: 16,
 
                 uv_size: 0.0625,
-            },
+                dict: BlockDictionary::from([
+                    (0, Block::default()),
+                    (
+                        1,
+                        Block {
+                            model: cube_model,
+                            transparent: false,
+                            ident: "grass".to_owned(),
+                            uv: [0.0, 0.0],
+                        },
+                    ),
+                    (
+                        2,
+                        Block {
+                            model: cube_model,
+                            transparent: false,
+                            ident: "stone".to_owned(),
+                            uv: [0.0625, 0.0],
+                        },
+                    ),
+                    (
+                        3,
+                        Block {
+                            model: cube_model,
+                            transparent: false,
+                            ident: "dirt".to_owned(),
+                            uv: [0.125, 0.0],
+                        },
+                    ),
+                ]),
+            }),
 
-            block_dictionary: BlockDictionary::from([
-                (0, Block::default()),
-                (
-                    1,
-                    Block {
-                        model: cube_model,
-                        transparent: false,
-                        ident: "grass".to_owned(),
-                        uv: [0.0, 0.0],
-                    },
-                ),
-                (
-                    2,
-                    Block {
-                        model: cube_model,
-                        transparent: false,
-                        ident: "stone".to_owned(),
-                        uv: [0.0625, 0.0],
-                    },
-                ),
-                (
-                    3,
-                    Block {
-                        model: cube_model,
-                        transparent: false,
-                        ident: "dirt".to_owned(),
-                        uv: [0.125, 0.0],
-                    },
-                ),
-            ]),
             player: Player::new(),
             time: 0.0,
             frames: 0.0,
@@ -195,7 +212,7 @@ pub async fn init() -> GameState<GameData, Event> {
     let shader_source = load_string("chunk.wgsl")
         .await
         .expect("error loading shader... :(");
-    game_state.renderer.create_group(
+    game_state.renderer.write().unwrap().create_group(
         "chunk_render_group",
         RenderGroupBuilder::new()
             .with("projection", Matrix::create_layout(0))
@@ -208,7 +225,7 @@ pub async fn init() -> GameState<GameData, Event> {
     );
 
     let texture_uniform = texture::Texture::load("texture_atlas.png").await;
-    game_state.renderer.set_global_uniform(
+    game_state.renderer.write().unwrap().set_global_uniform(
         "texture_atlas",
         texture_uniform.uniform(&texture::Texture::create_layout(3)),
     );
@@ -221,10 +238,18 @@ pub async fn init() -> GameState<GameData, Event> {
         100.0,
     );
     let proj = Matrix::new(projection).uniform(&Matrix::create_layout(0));
-    game_state.renderer.set_global_uniform("projection", proj);
+    game_state
+        .renderer
+        .write()
+        .unwrap()
+        .set_global_uniform("projection", proj);
 
     let camera = Matrix::new(glam::Mat4::IDENTITY).uniform(&Matrix::create_layout(1));
-    game_state.renderer.set_global_uniform("view", camera);
+    game_state
+        .renderer
+        .write()
+        .unwrap()
+        .set_global_uniform("view", camera);
 
     game_state.add_system(Event::Init, load_world);
     game_state.add_system(Event::Tick, player_input);
@@ -241,7 +266,7 @@ pub async fn init() -> GameState<GameData, Event> {
 }
 
 fn track_time(
-    renderer: &mut Renderer,
+    renderer: Arc<RwLock<Renderer>>,
     input: &mut Input,
     data: &mut GameData,
     queue: &mut Vec<Event>,

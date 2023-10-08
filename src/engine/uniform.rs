@@ -2,13 +2,14 @@ use crate::engine::matrix::Matrix;
 use crate::engine::texture::Texture;
 use wgpu::{BindGroup, BindGroupLayout, Buffer};
 
-#[allow(dead_code)]
+#[derive(Debug)]
 pub enum UniformData {
     Buffer(Buffer),
     Texture(Texture),
     Matrix(Matrix),
 }
 
+#[derive(Debug)]
 pub struct Uniform {
     pub location: u32,
     pub bind_group: BindGroup,
