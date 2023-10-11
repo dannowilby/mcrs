@@ -1,5 +1,7 @@
+use noise::utils::NoiseFnWrapper;
 use noise::NoiseFn;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub mod block;
 pub mod cube_model;
@@ -10,11 +12,22 @@ use block::BlockDictionary;
 pub type ChunkPos = (i32, i32, i32);
 pub type ChunkData = HashMap<ChunkPos, u32>;
 
+use libnoise::prelude::*;
+
 pub struct ChunkConfig {
     // initialized noise function
     // height bias
     // squish bias
-    pub noise: fn([f64; 3]) -> f64, // chunk size?
+    pub noise: Lambda<
+        3,
+        libnoise::Blend<
+            3,
+            libnoise::Fbm<3, libnoise::Simplex<3>>,
+            Scale<3, libnoise::Worley<3>>,
+            Scale<3, libnoise::Worley<3>>,
+        >,
+        fn(f64) -> f64,
+    >, // fn([f64; 3]) -> f64, //Arc<dyn NoiseFn<f64, 3> + Send + Sync>, // fn([f64; 3]) -> f64, // chunk size?
     pub noise_amplitude: (f64, f64, f64),
     pub depth: i32,
 
@@ -39,11 +52,12 @@ pub fn chunk_id(x: i32, y: i32, z: i32) -> String {
 pub fn is_transparent(
     chunk_config: &ChunkConfig,
     loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
     position: &(i32, i32, i32),
 ) -> bool {
     let (p0, p1, p2) = position;
-    dict.get(&get_block(chunk_config, loaded_chunks, &(*p0, p1 + 1, *p2)))
+    chunk_config
+        .dict
+        .get(&get_block(chunk_config, loaded_chunks, &(*p0, *p1, *p2)))
         .map_or(true, |b| b.transparent)
 }
 

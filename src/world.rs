@@ -2,6 +2,8 @@ use noise::{Simplex, Worley};
 use rayon::Scope;
 use rayon::ThreadPoolBuilder;
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
@@ -34,12 +36,17 @@ pub enum Event {
 
     Resized,
 
+    MeshChunks,
+
     PlayerMoved,
 }
 
 pub struct GameData {
     // component data
     loaded_chunks: Arc<RwLock<HashMap<String, ChunkData>>>,
+    chunks_to_mesh: VecDeque<(String, (i32, i32, i32))>,
+    currently_loading: Arc<Mutex<HashSet<String>>>,
+    thread_pool: rayon::ThreadPool,
 
     // singleton data
     chunk_config: Arc<ChunkConfig>,
@@ -49,11 +56,92 @@ pub struct GameData {
     pub focused: bool,
 }
 
+/*
+// TODO:
+// don't block on generation or meshing
+// periodically check if those functions have finished
+// when done, then join them
+fn mesh_chunks(
+    renderer: Arc<RwLock<Renderer>>,
+    input: &mut Input,
+    data: &mut GameData,
+    queue: &mut Vec<Event>,
+    delta: f64,
+) {
+    let thread_pool = &data.thread_pool;
+    let mesh_threshold = 16;
+    let mut counter = 0;
+
+    if data.chunks_to_mesh.read().unwrap().is_empty() {
+        return;
+    }
+
+    // mesh all the chunks
+    // if there are chunks to mesh, and less than the threshold
+    while !data.chunks_to_mesh.read().unwrap().is_empty() && counter < mesh_threshold {
+        counter += 1;
+        // pop the front of the chunks to mesh
+        if let Some((chunk_id, chunk_pos)) = data.chunks_to_mesh.write().unwrap().pop_front() {
+            // if not loaded yet
+            if !data.loaded_chunks.read().unwrap().contains_key(&chunk_id) {
+                data.chunks_to_mesh
+                    .write()
+                    .unwrap()
+                    .push_back((chunk_id.clone(), chunk_pos));
+            }
+            // otherwise spawn new thread to mesh
+            let config = data.chunk_config.clone();
+            let loaded_chunks = data.loaded_chunks.clone();
+            let renderer = renderer.clone();
+            thread_pool.spawn(move || {
+                // let mesh_start = instant::now();
+                let loaded_chunks = loaded_chunks.read().unwrap();
+
+                if !loaded_chunks.contains_key(&chunk_id) {
+                    return;
+                }
+
+                println!("Meshing: {}", &chunk_id);
+                let mesh = mesh_chunk(&loaded_chunks, &config, &chunk_pos, calc_lod());
+                println!("panic here? 1");
+
+                /*
+                println!(
+                    "Time to mesh chunk: {} is {}",
+                    &chunk_id,
+                    (instant::now() - mesh_start) / 1000.0
+                );
+                */
+
+                // add mesh to renderer
+                println!("panic here? 2");
+                let (x, y, z) = chunk_pos.clone();
+                let mat = Matrix::new(glam::Mat4::from_translation(glam::f32::vec3(
+                    0.0, // *x as f32 * config.depth as f32,
+                    0.0, // *y as f32 * config.depth as f32,
+                    0.0, // *z as f32 * config.depth as f32,
+                )))
+                .uniform(&Matrix::create_layout(2));
+                println!("Done meshing {}", &chunk_id);
+                let mut renderer = renderer.write().unwrap();
+                renderer.add_object(&chunk_id, mesh);
+                renderer.set_object_uniform(&chunk_id, "model", mat);
+                println!("Inserted mesh {}", &chunk_id);
+            });
+        }
+    }
+}
+*/
+
 // TODO:
 // - offload chunk loading onto a separate thread
-// - improve terrain generation
 //   - be able to query for a block position, just for the terrain
 // - maybe create new event for when a player moves chunk to load
+// add a mesh queue
+//
+// Meshing still takes a long time, my guess is that it is because it is
+// blocking on the renderer to insert the meshes
+//
 // TODO (stetch):
 // - Frustrum culling
 // - Occulsion culling
@@ -64,6 +152,7 @@ fn load_world(
     queue: &mut Vec<Event>,
     delta: f64,
 ) {
+    let thread_pool = &data.thread_pool;
     // chunk loading dimensions
     let (player_i, player_j, player_k) = data.player.position;
     let i = get_chunk_pos(&data.chunk_config, player_i.floor() as i32);
@@ -71,13 +160,12 @@ fn load_world(
     let k = get_chunk_pos(&data.chunk_config, player_k.floor() as i32);
     let radius = data.player.load_radius as i32;
 
-    let mut chunks_to_load = Vec::new();
     let mut chunks_to_remove: Vec<String> = data
         .loaded_chunks
         .read()
         .unwrap()
         .iter()
-        .map(|(k, v)| k.clone())
+        .map(|(k, _)| k.clone())
         .collect();
 
     // calculate chunks to modify
@@ -92,62 +180,51 @@ fn load_world(
                 }
 
                 // if loaded chunks doesn't contain it, but it should
-                if !data.loaded_chunks.read().unwrap().contains_key(&chunk_id) {
-                    chunks_to_load.push((chunk_id, (x, y, z)));
+                if !data.loaded_chunks.read().unwrap().contains_key(&chunk_id)
+                    && !data.currently_loading.lock().unwrap().contains(&chunk_id)
+                    && !data.chunks_to_mesh.contains(&(chunk_id.clone(), (x, y, z)))
+                {
+                    data.chunks_to_mesh.push_back((chunk_id.clone(), (x, y, z)));
                 }
             }
         }
     }
 
-    let thread_pool = ThreadPoolBuilder::new().num_threads(16).build().unwrap();
-
     // generate all the chunks
-    thread_pool.scope(|scope| {
-        for (chunk_id, chunk_pos) in &chunks_to_load {
-            let config = data.chunk_config.clone();
-            let loaded_chunks = data.loaded_chunks.clone();
-            scope.spawn(move |_| {
-                // load chunk
-                let chunk = load_chunk(&config, &chunk_pos);
-                loaded_chunks
-                    .write()
-                    .unwrap()
-                    .insert(chunk_id.clone(), chunk);
-            });
-        }
-    });
-
-    // mesh all the chunks
-    thread_pool.scope(|scope| {
-        for (chunk_id, chunk_pos) in &chunks_to_load {
+    while !data.chunks_to_mesh.is_empty() {
+        if let Some((chunk_id, chunk_pos)) = data.chunks_to_mesh.pop_front() {
+            let currently_loading = data.currently_loading.clone();
             let config = data.chunk_config.clone();
             let loaded_chunks = data.loaded_chunks.clone();
             let renderer = renderer.clone();
-            scope.spawn(move |_| {
-                // meshing takes to long
-                // need to make faster
-                let mesh = mesh_chunk(
-                    &loaded_chunks.read().unwrap(),
-                    &config,
-                    &chunk_pos,
-                    calc_lod(),
-                );
+
+            currently_loading.lock().unwrap().insert(chunk_id.clone());
+            // add to currently loading
+            thread_pool.spawn(move || {
+                // load chunk
+                let chunk = load_chunk(&config, &chunk_pos);
+                let mut loaded_chunks = loaded_chunks.write().unwrap();
+                loaded_chunks.insert(chunk_id.clone(), chunk);
+
+                let mesh = mesh_chunk(&loaded_chunks, &config, &chunk_pos, calc_lod());
 
                 // add mesh to renderer
                 let mat = Matrix::new(glam::Mat4::from_translation(glam::f32::vec3(
-                    0.0, //x as f32 * data.chunk_config.depth as f32,
-                    0.0, //y as f32 * data.chunk_config.depth as f32,
-                    0.0, //z as f32 * data.chunk_config.depth as f32,
+                    0.0, // *x as f32 * config.depth as f32,
+                    0.0, // *y as f32 * config.depth as f32,
+                    0.0, // *z as f32 * config.depth as f32,
                 )))
                 .uniform(&Matrix::create_layout(2));
-                renderer.write().unwrap().add_object(&chunk_id, mesh);
-                renderer
-                    .write()
-                    .unwrap()
-                    .set_object_uniform(&chunk_id, "model", mat);
-            })
+                {
+                    let mut renderer = renderer.write().unwrap();
+                    renderer.add_object(&chunk_id, mesh);
+                    renderer.set_object_uniform(&chunk_id, "model", mat);
+                }
+
+                currently_loading.lock().unwrap().remove(&chunk_id);
+            });
         }
-    });
+    }
 
     // remove unneeded chunks
     for c in chunks_to_remove {
@@ -156,6 +233,8 @@ fn load_world(
     }
 }
 
+use libnoise::prelude::*;
+
 pub async fn init() -> GameState<GameData, Event> {
     let seed = 123456789;
     let mut game_state = GameState::new(
@@ -163,10 +242,23 @@ pub async fn init() -> GameState<GameData, Event> {
         GameData {
             // chunk_data: HashMap::new(),
             loaded_chunks: Default::default(),
+            chunks_to_mesh: VecDeque::new(),
+            currently_loading: Arc::new(Mutex::new(HashSet::new())),
+            thread_pool: rayon::ThreadPoolBuilder::new()
+                .num_threads(16)
+                .build()
+                .unwrap(),
 
             chunk_config: Arc::new(ChunkConfig {
-                noise: |[x, y, z]| f64::sin(x) + f64::sin(y) + f64::sin(z),
-                noise_amplitude: (0.25, 0.25, 0.25),
+                noise: Source::simplex(42) // start with simplex noise
+                    .fbm(5, 0.013, 2.0, 0.5) // apply fractal brownian motion
+                    .blend(
+                        // apply blending...
+                        Source::worley(43).scale([0.05, 0.05, 0.05]), // ...with scaled worley noise
+                        Source::worley(44).scale([0.02, 0.02, 0.02]),
+                    ) // ...controlled by other worley noise
+                    .lambda(|f| (f * 2.0).sin() * 0.3 + f * 0.7), // apply a closure to the noise Source::worley(123), //Arc.fbm(3, 0.013, 2.0, 0.5); // ::new(Worley::new(0)), // |[x, y, z]| f64::sin(x) + f64::sin(y) + f64::sin(z),
+                noise_amplitude: (0.5, 0.5, 0.5),
                 depth: 16,
 
                 uv_size: 0.0625,
@@ -260,6 +352,7 @@ pub async fn init() -> GameState<GameData, Event> {
     game_state.add_system(Event::PlayerMoved, update_camera);
     game_state.add_system(Event::PlayerMoved, load_world);
     game_state.add_system(Event::Resized, update_perspective);
+    // game_state.add_system(Event::Tick, mesh_chunks);
 
     game_state.queue_event(Event::Init);
     game_state

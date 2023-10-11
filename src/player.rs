@@ -29,7 +29,7 @@ impl Player {
             fov: 1.0472,
             move_speed: 0.01,
             sensitivity: 0.2,
-            load_radius: 3,
+            load_radius: 5,
         }
     }
 }

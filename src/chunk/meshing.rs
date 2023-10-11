@@ -52,7 +52,6 @@ pub fn mesh_chunk(
 ) -> RenderObject {
     let mut vertices = Vec::<Vertex>::new();
     let mut indices = Vec::<u16>::new();
-    let mut last_index = 0;
 
     // loop over all blocks in chunk
     let chunk_id = chunk_id(chunk_pos.0, chunk_pos.1, chunk_pos.2);
@@ -66,15 +65,14 @@ pub fn mesh_chunk(
         );
 
         let block = config.dict.get(block_id);
-        let model = block.map(|b| b.model).unwrap_or(Block::default().model);
-        let (mut verts, mut inds) = model(loaded_chunks, config, &block_world_position, last_index);
-        vertices.append(&mut verts);
-        indices.append(&mut inds);
-        last_index = vertices.len() as u16;
-
-        // calc faces to add to mesh
-
-        // let visible_block_faces = get_visible_block_faces(position, block_id, chunk_data);
+        let model = block.unwrap_or(config.dict.get(&0).unwrap()).model;
+        model(
+            loaded_chunks,
+            config,
+            &block_world_position,
+            &mut vertices,
+            &mut indices,
+        );
     }
 
     RenderObject::new(

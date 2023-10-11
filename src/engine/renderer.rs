@@ -114,7 +114,13 @@ impl Renderer {
                     let global_uniform = self.uniforms.get(uniform_name);
                     let uniform = match global_uniform {
                         Some(x) => x,
-                        None => object.uniforms.get(uniform_name).unwrap(),
+                        None => match object.uniforms.get(uniform_name) {
+                            Some(x) => x,
+                            None => {
+                                println!("What: {}", uniform_name);
+                                continue;
+                            }
+                        },
                     };
 
                     render_pass.set_bind_group(uniform.location, &uniform.bind_group, &[]);
