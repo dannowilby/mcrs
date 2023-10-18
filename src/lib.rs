@@ -121,7 +121,7 @@ pub async fn run() {
             game_state.process_events();
             game_state.queue_event(world::Event::Tick);
 
-            let res = game_state.renderer.read().unwrap().render();
+            let res = game_state.renderer.render();
             match res {
                 Ok(_) => {}
                 Err(wgpu::SurfaceError::Lost) => {

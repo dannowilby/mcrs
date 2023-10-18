@@ -1,22 +1,32 @@
-use crate::chunk::{block::BlockDictionary, get_block, meshing::Vertex, ChunkConfig, ChunkData};
-use std::collections::HashMap;
-use std::sync::RwLock;
+use crate::chunk::{meshing::Vertex, ChunkConfig, ChunkData};
 
-use super::{get_local_block_pos, is_transparent};
+use super::Position;
+
+pub fn is_transparent(
+    chunk: &ChunkData,
+    chunk_config: &ChunkConfig,
+    position: &Position,
+) -> bool {
+    let (p0, p1, p2) = position;
+    let block = chunk.get(&position).unwrap_or(&u32::MAX);
+    chunk_config
+        .dict
+        .get(&block)
+        .map_or(true, |b| b.transparent)
+}
 
 fn ao(
+    chunk: &ChunkData,
     chunk_config: &ChunkConfig,
-    loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
-    p1: &(i32, i32, i32),
-    p2: &(i32, i32, i32),
-    p3: &(i32, i32, i32),
+    p1: &Position,
+    p2: &Position,
+    p3: &Position,
 ) -> f32 {
     let mut output = 1.0;
 
-    if !is_transparent(chunk_config, loaded_chunks, &(p1.0, p1.1 + 1, p1.2))
-        || !is_transparent(chunk_config, loaded_chunks, &(p2.0, p2.1 + 1, p2.2))
-        || !is_transparent(chunk_config, loaded_chunks, &(p3.0, p3.1 + 1, p3.2))
+    if !is_transparent(chunk, chunk_config, &(p1.0, p1.1 + 1, p1.2))
+        || !is_transparent(chunk, chunk_config, &(p2.0, p2.1 + 1, p2.2))
+        || !is_transparent(chunk, chunk_config, &(p3.0, p3.1 + 1, p3.2))
     {
         output = 0.5;
     }
@@ -25,7 +35,7 @@ fn ao(
 }
 
 pub fn cube_model(
-    loaded_chunks: &HashMap<String, ChunkData>,
+    chunk: &ChunkData,
     chunk_config: &ChunkConfig,
     position: &(i32, i32, i32),
     vertices: &mut Vec<Vertex>,
@@ -43,26 +53,25 @@ pub fn cube_model(
     */
 
     // get target block info, ~~if air then return~~ won't be air b/c air's model isn't this method
-    let block = get_block(chunk_config, loaded_chunks, &position);
+    let block = chunk.get(&position).unwrap();
     let target_block = dict.get(&block);
     let uv = target_block.unwrap().uv;
 
     // get surrounding block transparency info
-    let top_block = is_transparent(chunk_config, loaded_chunks, &(*p0, p1 + 1, *p2));
-    let bottom_block = is_transparent(chunk_config, loaded_chunks, &(*p0, p1 - 1, *p2));
+    let top_block = is_transparent(chunk, chunk_config, &(*p0, p1 + 1, *p2));
+    let bottom_block = is_transparent(chunk, chunk_config, &(*p0, p1 - 1, *p2));
 
-    let front_block = is_transparent(chunk_config, loaded_chunks, &(*p0, *p1, p2 + 1));
-    let back_block = is_transparent(chunk_config, loaded_chunks, &(*p0, *p1, p2 - 1));
+    let front_block = is_transparent(chunk, chunk_config, &(*p0, *p1, p2 + 1));
+    let back_block = is_transparent(chunk, chunk_config, &(*p0, *p1, p2 - 1));
 
-    let right_block = is_transparent(chunk_config, loaded_chunks, &(p0 + 1, *p1, *p2));
-    let left_block = is_transparent(chunk_config, loaded_chunks, &(p0 - 1, *p1, *p2));
+    let right_block = is_transparent(chunk, chunk_config, &(p0 + 1, *p1, *p2));
+    let left_block = is_transparent(chunk, chunk_config, &(p0 - 1, *p1, *p2));
 
     // top
     if top_block {
         top_face(
+            chunk,
             chunk_config,
-            loaded_chunks,
-            dict,
             position,
             &uv,
             vertices,
@@ -73,9 +82,8 @@ pub fn cube_model(
     // bottom
     if bottom_block {
         bottom_face(
+            chunk,
             chunk_config,
-            loaded_chunks,
-            dict,
             position,
             &uv,
             vertices,
@@ -86,9 +94,8 @@ pub fn cube_model(
     // front
     if front_block {
         front_face(
+            chunk,
             chunk_config,
-            loaded_chunks,
-            dict,
             position,
             &uv,
             vertices,
@@ -99,9 +106,8 @@ pub fn cube_model(
     // back
     if back_block {
         back_face(
+            chunk,
             chunk_config,
-            loaded_chunks,
-            dict,
             position,
             &uv,
             vertices,
@@ -111,9 +117,8 @@ pub fn cube_model(
 
     if right_block {
         right_face(
+            chunk,
             chunk_config,
-            loaded_chunks,
-            dict,
             position,
             &uv,
             vertices,
@@ -123,9 +128,8 @@ pub fn cube_model(
 
     if left_block {
         left_face(
+            chunk,
             chunk_config,
-            loaded_chunks,
-            dict,
             position,
             &uv,
             vertices,
@@ -135,9 +139,8 @@ pub fn cube_model(
 }
 
 fn top_face(
+    chunk: &ChunkData,
     chunk_config: &ChunkConfig,
-    loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
     position: &(i32, i32, i32),
     uv: &[f32; 2],
     vertices: &mut Vec<Vertex>,
@@ -165,9 +168,8 @@ fn top_face(
             position: [x, y + 1.0, z + 1.0],
             uv: [u, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i - 1, *j, *k),
                 &(*i, *j, *k + 1),
                 &(*i - 1, *j, *k + 1),
@@ -177,9 +179,8 @@ fn top_face(
             position: [x + 1.0, y + 1.0, z + 1.0],
             uv: [u + duv, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i + 1, *j, *k),
                 &(*i, *j, *k + 1),
                 &(*i + 1, *j, *k + 1),
@@ -189,9 +190,8 @@ fn top_face(
             position: [x, y + 1.0, z],
             uv: [u, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i, *j, *k - 1),
                 &(*i - 1, *j, *k),
                 &(*i - 1, *j, *k - 1),
@@ -201,9 +201,8 @@ fn top_face(
             position: [x + 1.0, y + 1.0, z],
             uv: [u + duv, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i + 1, *j, *k),
                 &(*i, *j, *k - 1),
                 &(*i + 1, *j, *k - 1),
@@ -213,9 +212,8 @@ fn top_face(
 }
 
 fn bottom_face(
+    chunk: &ChunkData,
     chunk_config: &ChunkConfig,
-    loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
     position: &(i32, i32, i32),
     uv: &[f32; 2],
     vertices: &mut Vec<Vertex>,
@@ -243,9 +241,8 @@ fn bottom_face(
             position: [x, y, z + 1.0],
             uv: [u, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i - 1, *j - 2, *k),
                 &(*i, *j - 2, *k + 1),
                 &(*i - 1, *j - 2, *k + 1),
@@ -255,9 +252,8 @@ fn bottom_face(
             position: [x + 1.0, y, z + 1.0],
             uv: [u + duv, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i + 1, *j - 2, *k),
                 &(*i, *j - 2, *k + 1),
                 &(*i + 1, *j - 2, *k + 1),
@@ -267,9 +263,8 @@ fn bottom_face(
             position: [x, y, z],
             uv: [u, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i - 1, *j - 2, *k),
                 &(*i, *j - 2, *k - 1),
                 &(*i - 1, *j - 2, *k - 1),
@@ -279,9 +274,8 @@ fn bottom_face(
             position: [x + 1.0, y, z],
             uv: [u + duv, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i + 1, *j - 2, *k),
                 &(*i, *j - 2, *k - 1),
                 &(*i + 1, *j - 2, *k - 1),
@@ -291,9 +285,8 @@ fn bottom_face(
 }
 
 fn front_face(
+    chunk: &ChunkData,
     chunk_config: &ChunkConfig,
-    loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
     position: &(i32, i32, i32),
     uv: &[f32; 2],
     vertices: &mut Vec<Vertex>,
@@ -321,9 +314,8 @@ fn front_face(
             position: [x, y, z + 1.0],
             uv: [u, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i - 1, *j - 1, *k + 1),
                 &(*i, *j - 2, *k + 1),
                 &(*i - 1, *j - 2, *k + 1),
@@ -333,9 +325,8 @@ fn front_face(
             position: [x + 1.0, y, z + 1.0],
             uv: [u + duv, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i + 1, *j - 1, *k + 1),
                 &(*i, *j - 2, *k + 1),
                 &(*i + 1, *j - 2, *k + 1),
@@ -345,9 +336,8 @@ fn front_face(
             position: [x, y + 1.0, z + 1.0],
             uv: [u, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i, *j, *k + 1),
                 &(*i - 1, *j - 1, *k + 1),
                 &(*i - 1, *j, *k + 1),
@@ -357,9 +347,8 @@ fn front_face(
             position: [x + 1.0, y + 1.0, z + 1.0],
             uv: [u + duv, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i, *j, *k + 1),
                 &(*i + 1, *j - 1, *k + 1),
                 &(*i + 1, *j, *k + 1),
@@ -369,9 +358,8 @@ fn front_face(
 }
 
 fn back_face(
+    chunk: &ChunkData,
     chunk_config: &ChunkConfig,
-    loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
     position: &(i32, i32, i32),
     uv: &[f32; 2],
     vertices: &mut Vec<Vertex>,
@@ -399,9 +387,8 @@ fn back_face(
             position: [x, y, z],
             uv: [u, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i - 1, *j - 1, *k - 1),
                 &(*i, *j - 2, *k - 1),
                 &(*i - 1, *j - 2, *k - 1),
@@ -411,9 +398,8 @@ fn back_face(
             position: [x + 1.0, y, z],
             uv: [u + duv, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i + 1, *j - 1, *k - 1),
                 &(*i, *j - 2, *k - 1),
                 &(*i + 1, *j - 2, *k - 1),
@@ -423,9 +409,8 @@ fn back_face(
             position: [x, y + 1.0, z],
             uv: [u, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i, *j, *k - 1),
                 &(*i - 1, *j - 1, *k - 1),
                 &(*i - 1, *j, *k - 1),
@@ -435,9 +420,8 @@ fn back_face(
             position: [x + 1.0, y + 1.0, z],
             uv: [u + duv, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i, *j, *k - 1),
                 &(*i + 1, *j - 1, *k - 1),
                 &(*i + 1, *j, *k - 1),
@@ -447,9 +431,8 @@ fn back_face(
 }
 
 fn right_face(
+    chunk: &ChunkData,
     chunk_config: &ChunkConfig,
-    loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
     position: &(i32, i32, i32),
     uv: &[f32; 2],
     vertices: &mut Vec<Vertex>,
@@ -477,9 +460,8 @@ fn right_face(
             position: [x + 1.0, y, z + 1.0],
             uv: [u, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i + 1, *j - 1, *k + 1),
                 &(*i + 1, *j - 2, *k),
                 &(*i + 1, *j - 2, *k + 1),
@@ -489,9 +471,8 @@ fn right_face(
             position: [x + 1.0, y + 1.0, z + 1.0],
             uv: [u + duv, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i + 1, *j, *k + 1),
                 &(*i + 1, *j, *k),
                 &(*i + 1, *j - 1, *k + 1),
@@ -501,9 +482,8 @@ fn right_face(
             position: [x + 1.0, y, z],
             uv: [u, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i + 1, *j - 1, *k - 1),
                 &(*i + 1, *j - 2, *k),
                 &(*i + 1, *j - 2, *k - 1),
@@ -513,9 +493,8 @@ fn right_face(
             position: [x + 1.0, y + 1.0, z],
             uv: [u + duv, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i + 1, *j, *k - 1),
                 &(*i + 1, *j, *k),
                 &(*i + 1, *j - 1, *k - 1),
@@ -524,9 +503,8 @@ fn right_face(
     ]);
 }
 fn left_face(
+    chunk: &ChunkData,
     chunk_config: &ChunkConfig,
-    loaded_chunks: &HashMap<String, ChunkData>,
-    dict: &BlockDictionary,
     position: &(i32, i32, i32),
     uv: &[f32; 2],
     vertices: &mut Vec<Vertex>,
@@ -554,9 +532,8 @@ fn left_face(
             position: [x, y, z + 1.0],
             uv: [u, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i - 1, *j - 1, *k + 1),
                 &(*i - 1, *j - 2, *k),
                 &(*i - 1, *j - 2, *k + 1),
@@ -566,9 +543,8 @@ fn left_face(
             position: [x, y + 1.0, z + 1.0],
             uv: [u + duv, v],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i - 1, *j, *k + 1),
                 &(*i - 1, *j, *k),
                 &(*i - 1, *j - 1, *k + 1),
@@ -578,9 +554,8 @@ fn left_face(
             position: [x, y, z],
             uv: [u, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i - 1, *j - 1, *k - 1),
                 &(*i - 1, *j - 2, *k),
                 &(*i - 1, *j - 2, *k - 1),
@@ -590,9 +565,8 @@ fn left_face(
             position: [x, y + 1.0, z],
             uv: [u + duv, v + duv],
             ao: ao(
+                chunk,
                 chunk_config,
-                loaded_chunks,
-                dict,
                 &(*i - 1, *j, *k - 1),
                 &(*i - 1, *j, *k),
                 &(*i - 1, *j - 1, *k - 1),

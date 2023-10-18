@@ -1,7 +1,106 @@
-use super::{block::BlockDictionary, chunk_id, ChunkConfig, ChunkData, ChunkPos};
-use std::collections::HashMap;
+use super::{ ChunkConfig, ChunkData, Position};
 
-use noise::NoiseFn;
+// need to rework this function
+pub fn ground_threshold(config: &ChunkConfig, pos: i32) -> f64 {
+    let ground_level = 0;
+    let change = 64;
+    let max_threshold = 0.5;
+    let min_threshold = -0.05;
+
+    let bias = (pos - ground_level) as f64 / change as f64;
+
+    if pos > ground_level {
+        return bias;
+    }
+    bias.max(min_threshold)
+}
+
+pub fn island_threshold(config: &ChunkConfig, pos: [i32; 3]) -> f64 {
+    let [x, y, z] = pos;
+    let t = config.depth as f64 * f64::exp(-(x as f64).abs()) - 1.0;
+    let r = config.depth as f64 * f64::exp(-(z as f64).abs()) - 1.0;
+    t.min(r)
+}
+
+// could abstract out the generating functions
+// would just overcomplicate things at the moment
+pub fn generate(config: &ChunkConfig, pos: &Position) -> ChunkData {
+    let mut output = ChunkData::new();
+    generate_terrain(config, pos, &mut output);
+    generate_foliage(config, pos, &mut output);
+    // generate ores
+    // generate structures
+
+    output
+}
+
+pub fn generate_foliage(config: &ChunkConfig, pos: &Position, output: &mut ChunkData) {
+    for (k, v) in output.iter_mut() {
+        let (x, y, z) = k;
+        let global_position = [
+            x + pos.0 * config.depth,
+            y + pos.1 * config.depth,
+            z + pos.2 * config.depth,
+        ];
+        if has_air_within_dist(config, global_position, 4) {
+            *v = 3;
+        }
+        if has_air_within_dist(config, global_position, 2) {
+            *v = 1;
+        }
+    }
+}
+
+use libnoise::prelude::*;
+
+pub fn has_air_within_dist(config: &ChunkConfig, pos: [i32; 3], dist: i32) -> bool {
+    for i in 0..dist.abs() {
+        if get_terrain_at(config, [pos[0], pos[1] + dist.signum() * i, pos[2]]) >= 0.0 {
+            return true;
+        }
+    }
+
+    false
+}
+
+pub fn get_terrain_at(config: &ChunkConfig, global_position: [i32; 3]) -> f64 {
+    let noise_position = [
+        config.noise_amplitude.0 * global_position[0] as f64,
+        config.noise_amplitude.1 * global_position[1] as f64,
+        config.noise_amplitude.2 * global_position[2] as f64,
+    ];
+    (&config.noise).sample(noise_position)
+        + ground_threshold(config, global_position[1])
+        + island_threshold(config, global_position)
+}
+
+pub fn generate_terrain(config: &ChunkConfig, pos: &Position, output: &mut ChunkData) {
+    for x in (-1)..(config.depth + 1) {
+        for y in (-1)..(config.depth + 1) {
+            for z in (-1)..(config.depth + 1) {
+                let position = (x, y, z);
+
+                let global_position = [
+                    x + pos.0 * config.depth,
+                    y + pos.1 * config.depth,
+                    z + pos.2 * config.depth,
+                ];
+
+                if get_terrain_at(config, global_position) < 0.0 {
+                    output.insert(position, 2);
+                }
+            }
+        }
+    }
+}
+
+pub fn load_chunk(config: &ChunkConfig, pos: &Position) -> ChunkData {
+    // load chuhnk from fs
+
+    // if no chunk data found,
+    // generate chunk
+    generate(config, pos)
+}
 
 pub fn ao_test() -> ChunkData {
     let mut output = ChunkData::new();
@@ -61,106 +160,4 @@ pub fn ao_test() -> ChunkData {
     output.insert((10, 2, 2), 1);
 
     output
-}
-
-// need to rework this function
-pub fn ground_threshold(config: &ChunkConfig, pos: i32) -> f64 {
-    let ground_level = 0;
-    let change = 64;
-    let max_threshold = 0.5;
-    let min_threshold = -0.05;
-
-    let bias = (pos - ground_level) as f64 / change as f64;
-
-    if pos > ground_level {
-        return bias;
-    }
-    bias.max(min_threshold)
-}
-
-pub fn island_threshold(config: &ChunkConfig, pos: [i32; 3]) -> f64 {
-    let [x, y, z] = pos;
-    let t = config.depth as f64 * f64::exp(-(x as f64).abs()) - 1.0;
-    let r = config.depth as f64 * f64::exp(-(z as f64).abs()) - 1.0;
-    t.min(r)
-}
-
-// could abstract out the generating functions
-// would just overcomplicate things at the moment
-pub fn generate(config: &ChunkConfig, pos: &ChunkPos) -> ChunkData {
-    let mut output = ChunkData::new();
-    generate_terrain(config, pos, &mut output);
-    generate_foliage(config, pos, &mut output);
-    // generate ores
-    // generate structures
-
-    output
-}
-
-pub fn generate_foliage(config: &ChunkConfig, pos: &ChunkPos, output: &mut ChunkData) {
-    for (k, v) in output.iter_mut() {
-        let (x, y, z) = k;
-        let global_position = [
-            x + pos.0 * config.depth,
-            y + pos.1 * config.depth,
-            z + pos.2 * config.depth,
-        ];
-        if has_air_within_dist(config, global_position, 4) {
-            *v = 3;
-        }
-        if has_air_within_dist(config, global_position, 2) {
-            *v = 1;
-        }
-    }
-}
-
-use libnoise::prelude::*;
-
-pub fn has_air_within_dist(config: &ChunkConfig, pos: [i32; 3], dist: i32) -> bool {
-    for i in 0..dist.abs() {
-        if get_terrain_at(config, [pos[0], pos[1] + dist.signum() * i, pos[2]]) >= 0.0 {
-            return true;
-        }
-    }
-
-    false
-}
-
-pub fn get_terrain_at(config: &ChunkConfig, global_position: [i32; 3]) -> f64 {
-    let noise_position = [
-        config.noise_amplitude.0 * global_position[0] as f64,
-        config.noise_amplitude.1 * global_position[1] as f64,
-        config.noise_amplitude.2 * global_position[2] as f64,
-    ];
-    (&config.noise).sample(noise_position)
-        + ground_threshold(config, global_position[1])
-        + island_threshold(config, global_position)
-}
-
-pub fn generate_terrain(config: &ChunkConfig, pos: &ChunkPos, output: &mut ChunkData) {
-    for x in 0..config.depth {
-        for y in 0..config.depth {
-            for z in 0..config.depth {
-                let position = (x, y, z);
-
-                let global_position = [
-                    x + pos.0 * config.depth,
-                    y + pos.1 * config.depth,
-                    z + pos.2 * config.depth,
-                ];
-
-                if get_terrain_at(config, global_position) < 0.0 {
-                    output.insert(position, 2);
-                }
-            }
-        }
-    }
-}
-
-pub fn load_chunk(config: &ChunkConfig, pos: &ChunkPos) -> ChunkData {
-    // load chuhnk from fs
-
-    // if no chunk data found,
-    // generate chunk
-    generate(config, pos)
 }

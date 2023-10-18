@@ -26,6 +26,7 @@ instant = "0.1"
 noise = "0.8"
 rayon = "1.7.0"
 libnoise = "0.1.0"
+priomutex = "0.3.1"
 
 [dependencies.image]
 version = "0.24.6"

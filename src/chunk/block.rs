@@ -1,20 +1,15 @@
 use std::collections::HashMap;
-use std::sync::RwLock;
 
 use crate::chunk::meshing::Vertex;
 use crate::chunk::ChunkData;
 
-use super::ChunkConfig;
+use super::{ChunkConfig, Position};
+
+pub type BlockModel = fn(&ChunkData, &ChunkConfig, &Position, &mut Vec<Vertex>, &mut Vec<u16>);
 
 pub struct Block {
     // will take in a raw position and chunk data
-    pub model: fn(
-        &HashMap<String, ChunkData>,
-        &ChunkConfig,
-        &(i32, i32, i32),
-        &mut Vec<Vertex>,
-        &mut Vec<u16>,
-    ),
+    pub model: BlockModel,
     pub transparent: bool,
     pub ident: String,
     pub uv: [f32; 2],

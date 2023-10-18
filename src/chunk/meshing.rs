@@ -1,12 +1,7 @@
-use std::collections::HashMap;
-use std::sync::RwLock;
 use wgpu::VertexBufferLayout;
 
 use super::super::engine::render_object::RenderObject;
-use super::block::{Block, BlockDictionary};
-use super::{chunk_id, LOD};
-use super::{get_block, ChunkData};
-use super::{ChunkConfig, ChunkPos};
+use super::{chunk_id, LOD, Position, ChunkData, ChunkConfig};
 
 #[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C)]
@@ -43,38 +38,47 @@ impl Vertex {
     }
 }
 
+pub fn should_mesh_block(config: &ChunkConfig, pos: &Position) -> bool {
+    if pos.0 < 0 || pos.1 < 0 || pos.2 < 0 || pos.0 >= config.depth || pos.1 >= config.depth || pos.2 >= config.depth {
+        return false;
+    }
+    true
+}
+
 // see what's taking so long in this function/and why
 pub fn mesh_chunk(
-    loaded_chunks: &HashMap<String, ChunkData>,
+    chunk: &ChunkData,
     config: &ChunkConfig,
-    chunk_pos: &ChunkPos,
+    chunk_pos: &Position,
     lod: LOD,
 ) -> RenderObject {
     let mut vertices = Vec::<Vertex>::new();
     let mut indices = Vec::<u16>::new();
 
-    // loop over all blocks in chunk
-    let chunk_id = chunk_id(chunk_pos.0, chunk_pos.1, chunk_pos.2);
-    for (position, block_id) in loaded_chunks.get(&chunk_id).unwrap().iter() {
-        // ideally, we want to change the mesh/vertex attributes
-        // based on the surrounding blocks
-        let block_world_position = (
-            chunk_pos.0 * config.depth + position.0,
-            chunk_pos.1 * config.depth + position.1,
-            chunk_pos.2 * config.depth + position.2,
-        );
+    let chunk_id = chunk_id(&chunk_pos);
 
+    // loop over all blocks stored
+    for (position, block_id) in chunk.iter() {
+        
+        // check for the boundary that we generated
+        // and don't want to mesh
+        if !should_mesh_block(config, position) {
+            continue;
+        }
+        
+        
         let block = config.dict.get(block_id);
         let model = block.unwrap_or(config.dict.get(&0).unwrap()).model;
         model(
-            loaded_chunks,
+            &chunk,
             config,
-            &block_world_position,
+            position,
             &mut vertices,
             &mut indices,
         );
+        
     }
-
+    
     RenderObject::new(
         "chunk_render_group",
         bytemuck::cast_slice(vertices.as_slice()),

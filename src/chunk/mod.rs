@@ -1,16 +1,23 @@
-use noise::utils::NoiseFnWrapper;
-use noise::NoiseFn;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 pub mod block;
 pub mod cube_model;
 pub mod generation;
 pub mod meshing;
+pub mod loading;
 use block::BlockDictionary;
 
-pub type ChunkPos = (i32, i32, i32);
-pub type ChunkData = HashMap<ChunkPos, u32>;
+/// We load chunks by an area of 
+/// depth + 2 * depth + 2 * depth + 2
+/// but then only mesh the inside of the chunk
+/// ie. depth * depth * depth
+/// so that we can generate the correct chunk borders for our mesh
+/// this also permits us to use a fairly parallelizable method of 
+/// chunk generation
+
+pub type Position = (i32, i32, i32);
+pub type ChunkData = HashMap<Position, u32>;
+pub type ChunkStorage = HashMap<String, ChunkData>;
 
 use libnoise::prelude::*;
 
@@ -36,48 +43,47 @@ pub struct ChunkConfig {
     pub dict: BlockDictionary,
 }
 
-fn get_local_block_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
+pub fn player_to_position(position: &(f32, f32, f32)) -> Position {
+    (position.0.floor() as i32, position.1.floor() as i32, position.2.floor() as i32)
+}
+
+pub fn local_position(chunk_config: &ChunkConfig, pos: &Position) -> Position {
+    (local_block_pos(chunk_config, pos.0),local_block_pos(chunk_config, pos.1),local_block_pos(chunk_config, pos.2))
+}
+
+pub fn local_block_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
     let size = chunk_config.depth;
     ((pos % size) + size) % size
 }
 
-pub fn get_chunk_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
+pub fn chunk_position(chunk_config: &ChunkConfig, pos: &Position) -> Position {
+    (
+        global_chunk_pos(chunk_config, pos.0),
+        global_chunk_pos(chunk_config, pos.1),
+        global_chunk_pos(chunk_config, pos.2),
+    )
+}
+
+pub fn global_chunk_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
     (pos as f32 / chunk_config.depth as f32).floor() as i32
 }
 
-pub fn chunk_id(x: i32, y: i32, z: i32) -> String {
-    format!("chunk-{}-{}-{}", x, y, z)
+pub fn chunk_id(pos: &Position) -> String {
+    format!("chunk-{}-{}-{}", pos.0, pos.1, pos.2)
 }
 
-pub fn is_transparent(
-    chunk_config: &ChunkConfig,
-    loaded_chunks: &HashMap<String, ChunkData>,
-    position: &(i32, i32, i32),
-) -> bool {
-    let (p0, p1, p2) = position;
-    chunk_config
-        .dict
-        .get(&get_block(chunk_config, loaded_chunks, &(*p0, *p1, *p2)))
-        .map_or(true, |b| b.transparent)
-}
 
 pub fn get_block(
     chunk_config: &ChunkConfig,
     loaded_chunks: &HashMap<String, ChunkData>,
-    raw_position: &(i32, i32, i32),
+    raw_position: &Position,
 ) -> u32 {
     let chunk_pos = chunk_id(
-        get_chunk_pos(chunk_config, raw_position.0),
-        get_chunk_pos(chunk_config, raw_position.1),
-        get_chunk_pos(chunk_config, raw_position.2),
+        &chunk_position(chunk_config, raw_position)
     );
     let chunk_query = loaded_chunks.get(&chunk_pos);
     if let Some(chunk_data) = chunk_query {
-        let block_pos = (
-            get_local_block_pos(chunk_config, raw_position.0),
-            get_local_block_pos(chunk_config, raw_position.1),
-            get_local_block_pos(chunk_config, raw_position.2),
-        );
+        let block_pos = local_position(chunk_config, raw_position);
         let block = chunk_data.get(&block_pos);
 
         if let Some(block_id) = block {

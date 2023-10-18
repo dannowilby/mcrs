@@ -1,7 +1,6 @@
 use crate::{
     engine::{
         input::Input,
-        matrix::Matrix,
         renderer::Renderer,
         uniform::{Uniform, UniformData},
     },
@@ -29,14 +28,14 @@ impl Player {
             fov: 1.0472,
             move_speed: 0.01,
             sensitivity: 0.2,
-            load_radius: 5,
+            load_radius: 4,
         }
     }
 }
 
 // camera controller input
 pub fn player_input(
-    renderer: Arc<RwLock<Renderer>>,
+    renderer: &mut Renderer,
     input: &mut Input,
     data: &mut GameData,
     queue: &mut Vec<Event>,
@@ -105,7 +104,7 @@ pub fn player_input(
 // this does the actual updating of the camera buffer
 // the input method just updates the values
 pub fn update_camera(
-    renderer: Arc<RwLock<Renderer>>,
+    renderer: &mut Renderer,
     input: &mut Input,
     data: &mut GameData,
     queue: &mut Vec<Event>,
@@ -114,7 +113,7 @@ pub fn update_camera(
     if let Some(Uniform {
         data: UniformData::Matrix(m),
         ..
-    }) = renderer.write().unwrap().get_global_uniform("view")
+    }) = renderer.get_global_uniform("view")
     {
         let mat = m.matrix();
 
@@ -135,7 +134,7 @@ pub fn update_camera(
 // perspective matrix configuration
 // called on resize
 pub fn update_perspective(
-    renderer: Arc<RwLock<Renderer>>,
+    renderer: &mut Renderer,
     input: &mut Input,
     data: &mut GameData,
     queue: &mut Vec<Event>,
@@ -144,7 +143,7 @@ pub fn update_perspective(
     if let Some(Uniform {
         data: UniformData::Matrix(m),
         ..
-    }) = renderer.write().unwrap().get_global_uniform("projection")
+    }) = renderer.get_global_uniform("projection")
     {
         let config = &window_state().config;
         let mat = m.matrix();
@@ -152,7 +151,7 @@ pub fn update_perspective(
             data.player.fov,
             config.width as f32 / config.height as f32,
             0.1,
-            100.0,
+            1000.0,
         );
         m.update_buffer();
     }
@@ -161,7 +160,7 @@ pub fn update_perspective(
 // check when the player is actively in the window
 // currently ESC backs them out
 pub fn focus_window(
-    renderer: Arc<RwLock<Renderer>>,
+    renderer: &mut Renderer,
     input: &mut Input,
     data: &mut GameData,
     queue: &mut Vec<Event>,
