@@ -1,13 +1,12 @@
 use winit::window::Window;
 use winit::{event::*, event_loop::EventLoop, window::WindowBuilder};
 
-mod camera;
 mod chunk;
 mod engine;
+mod physics;
 mod player;
 mod window;
 mod world;
-use crate::engine::game_state;
 use crate::window::WindowState;
 
 #[cfg(target_arch = "wasm32")]
@@ -15,10 +14,13 @@ use wasm_bindgen::prelude::*;
 
 // use crate::engine::test_render_initialization;
 
-// we figure out what this is very early on in runtime
-// we only ever need to borrow_mut this variable
-// when we resize the window,
-// currently we don't have to account for multithreading
+/// We create a static mutable variable for the window state.
+/// The state doesn't really change too often.\
+///
+/// We figure out what this is very early on in runtime
+/// we only ever need to borrow_mut this variable
+/// when we resize the window,
+/// currently we don't have to account for multithreading
 static mut WINDOW_STATE: Option<WindowState> = None;
 
 // these functions aren't the most sound,

@@ -2,12 +2,7 @@ use crate::chunk::{meshing::Vertex, ChunkConfig, ChunkData};
 
 use super::Position;
 
-pub fn is_transparent(
-    chunk: &ChunkData,
-    chunk_config: &ChunkConfig,
-    position: &Position,
-) -> bool {
-    let (p0, p1, p2) = position;
+pub fn is_transparent(chunk: &ChunkData, chunk_config: &ChunkConfig, position: &Position) -> bool {
     let block = chunk.get(&position).unwrap_or(&u32::MAX);
     chunk_config
         .dict
@@ -69,72 +64,30 @@ pub fn cube_model(
 
     // top
     if top_block {
-        top_face(
-            chunk,
-            chunk_config,
-            position,
-            &uv,
-            vertices,
-            indices,
-        );
+        top_face(chunk, chunk_config, position, &uv, vertices, indices);
     }
 
     // bottom
     if bottom_block {
-        bottom_face(
-            chunk,
-            chunk_config,
-            position,
-            &uv,
-            vertices,
-            indices,
-        );
+        bottom_face(chunk, chunk_config, position, &uv, vertices, indices);
     }
 
     // front
     if front_block {
-        front_face(
-            chunk,
-            chunk_config,
-            position,
-            &uv,
-            vertices,
-            indices,
-        );
+        front_face(chunk, chunk_config, position, &uv, vertices, indices);
     }
 
     // back
     if back_block {
-        back_face(
-            chunk,
-            chunk_config,
-            position,
-            &uv,
-            vertices,
-            indices,
-        );
+        back_face(chunk, chunk_config, position, &uv, vertices, indices);
     }
 
     if right_block {
-        right_face(
-            chunk,
-            chunk_config,
-            position,
-            &uv,
-            vertices,
-            indices,
-        );
+        right_face(chunk, chunk_config, position, &uv, vertices, indices);
     }
 
     if left_block {
-        left_face(
-            chunk,
-            chunk_config,
-            position,
-            &uv,
-            vertices,
-            indices,
-        );
+        left_face(chunk, chunk_config, position, &uv, vertices, indices);
     }
 }
 

@@ -1,18 +1,22 @@
+//! Module for all things involving chunks
+
 use std::collections::HashMap;
 
 pub mod block;
+pub mod collision;
 pub mod cube_model;
 pub mod generation;
-pub mod meshing;
 pub mod loading;
+pub mod meshing;
 use block::BlockDictionary;
 
-/// We load chunks by an area of 
+
+/// We load chunks by an area of
 /// depth + 2 * depth + 2 * depth + 2
 /// but then only mesh the inside of the chunk
 /// ie. depth * depth * depth
 /// so that we can generate the correct chunk borders for our mesh
-/// this also permits us to use a fairly parallelizable method of 
+/// this also permits us to use a fairly parallelizable method of
 /// chunk generation
 
 pub type Position = (i32, i32, i32);
@@ -43,19 +47,32 @@ pub struct ChunkConfig {
     pub dict: BlockDictionary,
 }
 
+/// convert player float tuple to i32 tuple
+/// ie. a player with position (xf32, yf32, zf32) -> (xi32, yi32, zi32)
 pub fn player_to_position(position: &(f32, f32, f32)) -> Position {
-    (position.0.floor() as i32, position.1.floor() as i32, position.2.floor() as i32)
+    (
+        position.0.floor() as i32,
+        position.1.floor() as i32,
+        position.2.floor() as i32,
+    )
 }
 
+/// convert a world space block pos tuple into the chunk local block pos tuple
 pub fn local_position(chunk_config: &ChunkConfig, pos: &Position) -> Position {
-    (local_block_pos(chunk_config, pos.0),local_block_pos(chunk_config, pos.1),local_block_pos(chunk_config, pos.2))
+    (
+        local_block_pos(chunk_config, pos.0),
+        local_block_pos(chunk_config, pos.1),
+        local_block_pos(chunk_config, pos.2),
+    )
 }
 
+/// convert a world space block pos into the chunk local block pos
 pub fn local_block_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
     let size = chunk_config.depth;
     ((pos % size) + size) % size
 }
 
+/// convert a world space position tuple to get a chunk pos tuple
 pub fn chunk_position(chunk_config: &ChunkConfig, pos: &Position) -> Position {
     (
         global_chunk_pos(chunk_config, pos.0),
@@ -64,23 +81,22 @@ pub fn chunk_position(chunk_config: &ChunkConfig, pos: &Position) -> Position {
     )
 }
 
+/// convert a world space position to get a chunk pos
 pub fn global_chunk_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
     (pos as f32 / chunk_config.depth as f32).floor() as i32
 }
 
+/// take a position and return a chunk_id
 pub fn chunk_id(pos: &Position) -> String {
     format!("chunk-{}-{}-{}", pos.0, pos.1, pos.2)
 }
-
 
 pub fn get_block(
     chunk_config: &ChunkConfig,
     loaded_chunks: &HashMap<String, ChunkData>,
     raw_position: &Position,
 ) -> u32 {
-    let chunk_pos = chunk_id(
-        &chunk_position(chunk_config, raw_position)
-    );
+    let chunk_pos = chunk_id(&chunk_position(chunk_config, raw_position));
     let chunk_query = loaded_chunks.get(&chunk_pos);
     if let Some(chunk_data) = chunk_query {
         let block_pos = local_position(chunk_config, raw_position);

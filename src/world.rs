@@ -1,27 +1,34 @@
+use priomutex::Mutex;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
-use priomutex::Mutex;
 
-use crate::chunk::ChunkConfig;
-use crate::chunk::ChunkData;
-use crate::chunk::Position;
 use crate::chunk::block::{Block, BlockDictionary};
 use crate::chunk::cube_model::cube_model;
 use crate::chunk::loading::check_done_load_world;
 use crate::chunk::loading::load_world;
 use crate::chunk::meshing;
+use crate::chunk::ChunkConfig;
+use crate::chunk::ChunkData;
+use crate::chunk::ChunkStorage;
+use crate::chunk::Position;
 use crate::engine::game_state::GameState;
 use crate::engine::input::Input;
 use crate::engine::matrix::Matrix;
 use crate::engine::render_group::RenderGroupBuilder;
 use crate::engine::render_object::RenderObject;
 use crate::engine::renderer::Renderer;
-use crate::engine::texture;
 use crate::engine::resources::load_string;
+use crate::engine::texture;
 
+use crate::physics::simulate_physics;
+use crate::physics::PhysicsEngine;
+use crate::player::init_player;
+use crate::player::simulate_player;
 use crate::player::{focus_window, player_input, update_camera, update_perspective, Player};
 use crate::window_state;
+
+use rapier3d::prelude::*;
 
 #[derive(PartialEq, Eq, Hash)]
 pub enum Event {
@@ -30,18 +37,21 @@ pub enum Event {
 
     Resized,
 
-    MeshChunks,
-
     PlayerMoved,
 }
 
 pub struct GameData {
     // component data
-    pub loaded_chunks: HashMap<String, ChunkData>,
-    
+
+    // chunks
+    pub loaded_chunks: ChunkStorage,
+
     pub loading: HashSet<String>,
-    pub done_loading: Arc<Mutex<HashMap<String, (Position, ChunkData, RenderObject)>>>,
-    
+    pub done_loading: Arc<Mutex<HashMap<String, (Position, ChunkData, RenderObject, Collider)>>>,
+
+    // physics
+    pub physics_engine: PhysicsEngine,
+
     pub thread_pool: rayon::ThreadPool,
 
     // singleton data
@@ -60,16 +70,19 @@ pub async fn init() -> GameState<GameData, Event> {
         Renderer::new(),
         GameData {
             // chunk_data: HashMap::new(),
-            loaded_chunks: Default::default(),
+            loaded_chunks: ChunkStorage::new(),
             loading: HashSet::new(),
             done_loading: Arc::new(Mutex::new(HashMap::new())),
+
+            physics_engine: PhysicsEngine::new(),
+
             thread_pool: rayon::ThreadPoolBuilder::new()
                 .num_threads(16)
                 .build()
                 .unwrap(),
 
             chunk_config: Arc::new(ChunkConfig {
-                noise: Source::simplex(42) // start with simplex noise
+                noise: Source::simplex(seed) // start with simplex noise
                     .fbm(5, 0.013, 2.0, 0.5) // apply fractal brownian motion
                     .blend(
                         // apply blending...
@@ -149,20 +162,18 @@ pub async fn init() -> GameState<GameData, Event> {
         100.0,
     );
     let proj = Matrix::new(projection).uniform(&Matrix::create_layout(0));
-    game_state
-        .renderer
-        .set_global_uniform("projection", proj);
+    game_state.renderer.set_global_uniform("projection", proj);
 
     let camera = Matrix::new(glam::Mat4::IDENTITY).uniform(&Matrix::create_layout(1));
-    game_state
-        .renderer
-        .set_global_uniform("view", camera);
+    game_state.renderer.set_global_uniform("view", camera);
 
     game_state.add_system(Event::Init, load_world);
+    game_state.add_system(Event::Init, init_player);
     game_state.add_system(Event::Tick, player_input);
     game_state.add_system(Event::Tick, track_time);
     game_state.add_system(Event::Tick, focus_window);
     // game_state.add_system(Event::Tick, cursor_lock);
+    game_state.add_system(Event::Tick, simulate_player);
 
     game_state.add_system(Event::PlayerMoved, update_camera);
     game_state.add_system(Event::PlayerMoved, load_world);
@@ -188,8 +199,9 @@ fn track_time(
         println!("{}", 1000.0 * data.frames / data.time);
         data.frames = 0.0;
         data.time = 0.0;
-        let (x, y, z) = data.player.position;
-        println!("player: {}, {}, {}", x, y, z);
+        let pos = data.physics_engine.get_rigid_body("player".to_string()).unwrap().translation();
+        // let (x, y, z) = data.player.position;
+        println!("player: {}, {}, {}", pos.x, pos.y, pos.z);
         println!("Num chunks loading: {}", data.loading.len());
     }
 }

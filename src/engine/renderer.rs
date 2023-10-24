@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::{collections::HashMap, sync::RwLock};
+use std::collections::HashMap;
 
 use crate::window_state;
 

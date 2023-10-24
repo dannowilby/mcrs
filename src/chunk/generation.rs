@@ -1,10 +1,10 @@
-use super::{ ChunkConfig, ChunkData, Position};
+use super::{ChunkConfig, ChunkData, Position};
 
 // need to rework this function
-pub fn ground_threshold(config: &ChunkConfig, pos: i32) -> f64 {
+pub fn ground_threshold(_config: &ChunkConfig, pos: i32) -> f64 {
     let ground_level = 0;
     let change = 64;
-    let max_threshold = 0.5;
+    let _max_threshold = 0.5;
     let min_threshold = -0.05;
 
     let bias = (pos - ground_level) as f64 / change as f64;
@@ -16,7 +16,7 @@ pub fn ground_threshold(config: &ChunkConfig, pos: i32) -> f64 {
 }
 
 pub fn island_threshold(config: &ChunkConfig, pos: [i32; 3]) -> f64 {
-    let [x, y, z] = pos;
+    let [x, _y, z] = pos;
     let t = config.depth as f64 * f64::exp(-(x as f64).abs()) - 1.0;
     let r = config.depth as f64 * f64::exp(-(z as f64).abs()) - 1.0;
     t.min(r)
@@ -102,6 +102,7 @@ pub fn load_chunk(config: &ChunkConfig, pos: &Position) -> ChunkData {
     generate(config, pos)
 }
 
+#[allow(dead_code)]
 pub fn ao_test() -> ChunkData {
     let mut output = ChunkData::new();
 
