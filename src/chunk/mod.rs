@@ -43,6 +43,7 @@ pub struct ChunkConfig {
     pub depth: i32,
 
     pub uv_size: f32,
+    pub load_radius: u32,
 
     pub dict: BlockDictionary,
 }
@@ -57,6 +58,7 @@ pub fn player_to_position(position: &(f32, f32, f32)) -> Position {
     )
 }
 
+#[allow(dead_code)]
 /// convert a world space block pos tuple into the chunk local block pos tuple
 pub fn local_position(chunk_config: &ChunkConfig, pos: &Position) -> Position {
     (
@@ -91,6 +93,7 @@ pub fn chunk_id(pos: &Position) -> String {
     format!("chunk-{}-{}-{}", pos.0, pos.1, pos.2)
 }
 
+#[allow(dead_code)]
 pub fn get_block(
     chunk_config: &ChunkConfig,
     loaded_chunks: &HashMap<String, ChunkData>,

@@ -19,12 +19,20 @@ pub fn load_world(
     _delta: f64,
 ) {
     let thread_pool = &data.thread_pool;
+    
+    let mut position = (0, 0, 0);
+    if let Some(player) = data.physics_engine.get_rigid_body("player".to_string()) {
+        let player_pos = player.translation();
+        position = player_to_position(&(player_pos.x, player_pos.y, player_pos.z));
+    }
+    
+    
     // chunk loading dimensions
     let (i, j, k) = chunk_position(
         &data.chunk_config,
-        &player_to_position(&data.player.position),
+        &position,
     );
-    let radius = data.player.load_radius as i32;
+    let radius = data.chunk_config.load_radius as i32;
 
     let mut chunks_to_remove: Vec<String> =
         data.loaded_chunks.iter().map(|(k, _)| k.clone()).collect();

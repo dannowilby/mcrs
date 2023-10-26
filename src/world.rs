@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crate::chunk::block::{Block, BlockDictionary};
 use crate::chunk::cube_model::cube_model;
+use crate::chunk::get_block;
 use crate::chunk::loading::check_done_load_world;
 use crate::chunk::loading::load_world;
 use crate::chunk::meshing;
@@ -21,7 +22,6 @@ use crate::engine::renderer::Renderer;
 use crate::engine::resources::load_string;
 use crate::engine::texture;
 
-use crate::physics::simulate_physics;
 use crate::physics::PhysicsEngine;
 use crate::player::init_player;
 use crate::player::simulate_player;
@@ -92,6 +92,7 @@ pub async fn init() -> GameState<GameData, Event> {
                     .lambda(|f| (f * 2.0).sin() * 0.3 + f * 0.7), // apply a closure to the noise Source::worley(123), //Arc.fbm(3, 0.013, 2.0, 0.5); // ::new(Worley::new(0)), // |[x, y, z]| f64::sin(x) + f64::sin(y) + f64::sin(z),
                 noise_amplitude: (0.5, 0.5, 0.5),
                 depth: 32,
+                load_radius: 4,
 
                 uv_size: 0.0625,
                 dict: BlockDictionary::from([
@@ -133,10 +134,10 @@ pub async fn init() -> GameState<GameData, Event> {
         },
     );
 
-    let shader_source = load_string("chunk.wgsl")
+    let shader_source = load_string("chunk.wgsl", true)
         .await
         .expect("error loading shader... :(");
-    game_state.renderer.create_group(
+    game_state.renderer.add_group(
         "chunk_render_group",
         RenderGroupBuilder::new()
             .with("projection", Matrix::create_layout(0))
@@ -167,6 +168,15 @@ pub async fn init() -> GameState<GameData, Event> {
     let camera = Matrix::new(glam::Mat4::IDENTITY).uniform(&Matrix::create_layout(1));
     game_state.renderer.set_global_uniform("view", camera);
 
+    // load player
+    let translation = Isometry::translation(game_state.data.player.position.0, game_state.data.player.position.1, game_state.data.player.position.2);
+    let mut rigidbody = RigidBodyBuilder::dynamic().lock_rotations().enabled_rotations(false, false, false).build();
+    rigidbody.set_position(translation, true);
+    let collider = ColliderBuilder::capsule_y(0.75, 0.25).build();
+    game_state.data.physics_engine.insert_entity("player", rigidbody, collider);
+    
+    update_camera(&mut game_state.renderer, &mut game_state.input, &mut game_state.data, &mut vec![], 0.0);
+    
     game_state.add_system(Event::Init, load_world);
     game_state.add_system(Event::Init, init_player);
     game_state.add_system(Event::Tick, player_input);
@@ -203,5 +213,6 @@ fn track_time(
         // let (x, y, z) = data.player.position;
         println!("player: {}, {}, {}", pos.x, pos.y, pos.z);
         println!("Num chunks loading: {}", data.loading.len());
+        println!("colliding?: {}", data.physics_engine.is_colliding("player"));
     }
 }

@@ -5,10 +5,12 @@ use crate::engine::renderer::Renderer;
 use crate::window_state_mut;
 use winit::dpi::PhysicalSize;
 
-// D = game data
-// E = event enum: hashable
+/// Used by the game state struct to more ergonomically refer to its systems.
 pub type System<D, E> = fn(&mut Renderer, &mut Input, &mut D, &mut Vec<E>, f64);
 
+/// Stores all the systems, event queues, delta, input, renderer, and systems for the game state. \
+/// ```D``` is the game state data, there are no restrictions on what this can be. \
+/// ```E``` is the enum of Events, has to be hashable.
 pub struct GameState<D, E>
 where
     E: PartialEq + Eq + std::hash::Hash,
@@ -27,6 +29,7 @@ impl<D, E> GameState<D, E>
 where
     E: PartialEq + Eq + std::hash::Hash,
 {
+    /// Make a new game state from a renderer and game data.
     pub fn new(renderer: Renderer, data: D) -> Self {
         Self {
             data,
@@ -40,14 +43,15 @@ where
         }
     }
 
+    /// Updates the window state surface and calls the resize method on the renderer.
+    pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
     // must set window_state to new size since
     // renderer reads from it
-    // might want to change and just pass directly in the future
-    pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         window_state_mut().resize(new_size);
         self.renderer.resize();
     }
 
+    /// Add a new system for the corresponding event.
     pub fn add_system(&mut self, event: E, system: System<D, E>) {
         self.systems
             .entry(event)
@@ -55,7 +59,7 @@ where
             .or_insert(vec![system]);
     }
 
-    // update
+    /// Drain the event queue and process the events.
     pub fn process_events(&mut self) {
         while let Some(event) = self.queue[self.plex].pop() {
             if let Some(system) = self.systems.get(&event) {
@@ -74,6 +78,7 @@ where
         self.plex = 1 - self.plex;
     }
 
+    /// Add an event to be processed next frame.
     pub fn queue_event(&mut self, event: E) {
         self.queue[self.plex].push(event);
     }

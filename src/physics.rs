@@ -125,6 +125,20 @@ impl PhysicsEngine {
             &(),
         );
     }
+    
+    pub fn is_colliding(&self, id: &str) -> bool {
+        let handle = self.colliders_handles.get(id);
+       
+        if let Some(handle) = handle {
+            for i in self.narrow_phase.contacts_with(handle.clone()) {
+                if i.has_any_active_contact {
+                    return true;
+                }
+            }
+        }
+        
+        false 
+    }
 }
 
 pub fn simulate_physics(

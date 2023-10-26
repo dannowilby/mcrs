@@ -17,10 +17,8 @@ use wasm_bindgen::prelude::*;
 /// We create a static mutable variable for the window state.
 /// The state doesn't really change too often.\
 ///
-/// We figure out what this is very early on in runtime
-/// we only ever need to borrow_mut this variable
-/// when we resize the window,
-/// currently we don't have to account for multithreading
+/// We figure out what this is very early on in runtime.
+/// We maay later change this to use OnceCell.
 static mut WINDOW_STATE: Option<WindowState> = None;
 
 // these functions aren't the most sound,

@@ -1,3 +1,8 @@
+//! Used to encasuplate WGPU rendering functions. \
+//! Used to store global uniforms, a common depth texture, and the following: \
+//! [Render groups](super::render_group::RenderGroup) contain the layout data for render objects to be rendererd. \
+//! [Render objects](super::render_object::RenderObject) contain mesh data and uniform data for that object.
+
 use std::collections::HashMap;
 
 use crate::window_state;
@@ -6,6 +11,9 @@ use super::{
     render_group::RenderGroup, render_object::RenderObject, texture::Texture, uniform::Uniform,
 };
 
+/// The idea behind this struct is that we register the things we want to
+/// render and how we want to render it with this struct using string handles, and
+/// then keep all other game object data in the [GameData](super::game_state::GameData).
 pub struct Renderer {
     render_groups: HashMap<String, RenderGroup>,
     render_objects: HashMap<String, RenderObject>,
@@ -14,6 +22,8 @@ pub struct Renderer {
 }
 
 impl Renderer {
+    
+    /// Create a new Renderer. 
     pub fn new() -> Self {
         let device = &window_state().device;
         let config = &window_state().config;
@@ -25,19 +35,26 @@ impl Renderer {
         }
     }
 
-    pub fn create_group(&mut self, label: &str, render_group: RenderGroup) {
+    /// Add a render group to the renderer. \
+    /// We store each render group with a string id so that our render objects can refer to it. \
+    /// If we remove the render group and not the object that refer to it then the render method will panic.
+    pub fn add_group(&mut self, label: &str, render_group: RenderGroup) {
         self.render_groups.insert(label.to_owned(), render_group);
     }
 
-    // should always return a valid reference, panic if None is found
+    /// Add a render object into the renderer.
+    /// The render group associated with this must also be added to the renderer
+    /// otherwise the render method will panic. 
     pub fn add_object(&mut self, id: &str, object: RenderObject) {
         self.render_objects.insert(id.to_owned(), object);
     }
 
+    /// Removes the render object and returns it if it exists.
     pub fn remove_object(&mut self, id: &str) -> Option<RenderObject> {
         self.render_objects.remove(id)
     }
 
+    /// Set the uniform on the specified render object.
     pub fn set_object_uniform(&mut self, id: &str, uniform_name: &str, uniform: Uniform) {
         self.render_objects
             .get_mut(id)
@@ -45,22 +62,29 @@ impl Renderer {
             .set_uniform(uniform_name, uniform);
     }
 
+    #[allow(dead_code)]
+    /// Check if a the renderer contains the specified render object by id.
     pub fn contains_object(&self, id: &str) -> bool {
         self.render_objects.contains_key(id)
     }
 
-    pub fn get_mut_object<'a>(&'a mut self, id: &str) -> &'a mut RenderObject {
-        self.render_objects.get_mut(id).unwrap()
+    #[allow(dead_code)]
+    /// Get a mutable reference to the added render object.
+    pub fn get_mut_object(&mut self, id: &str) -> Option<&mut RenderObject> {
+        self.render_objects.get_mut(id)
     }
 
+    /// Set a uniform that will be used in all render groups. 
     pub fn set_global_uniform(&mut self, uniform_name: &str, uniform: Uniform) {
         self.uniforms.insert(uniform_name.to_owned(), uniform);
     }
 
+    /// Get a mutable reference to the queried global uniform.
     pub fn get_global_uniform(&mut self, uniform_name: &str) -> Option<&mut Uniform> {
         self.uniforms.get_mut(uniform_name)
     }
 
+    /// Render all added render objects.
     pub fn render(&self) -> Result<(), wgpu::SurfaceError> {
         let device = &window_state().device;
         let surface = &window_state().surface;
@@ -102,34 +126,37 @@ impl Renderer {
             });
 
             // encode the render commands
+            // loop over all render objects
             for (_id, object) in self.render_objects.iter() {
+                // get the render object's render group
                 let group = self.render_groups.get(&object.render_group).expect(
                     "Referenced a render group that does not exist! You are using this wrong!",
                 );
 
                 render_pass.set_pipeline(&group.pipeline);
 
+                // for the uniforms in the group
                 for uniform_name in group.uniforms.iter() {
+                    // check if a global uniform first
                     let global_uniform = self.uniforms.get(uniform_name);
                     let uniform = match global_uniform {
                         Some(x) => x,
-                        None => match object.uniforms.get(uniform_name) {
-                            Some(x) => x,
-                            None => {
-                                println!("What: {}", uniform_name);
-                                continue;
-                            }
-                        },
+                        // if not a global uniform, then it's a object uniform
+                        None => object.uniforms.get(uniform_name).expect(&format!("Uniform {} not specified", uniform_name)) 
                     };
 
+                    // set the uniform
                     render_pass.set_bind_group(uniform.location, &uniform.bind_group, &[]);
                 }
 
+                // set the vertex buffer
                 render_pass.set_vertex_buffer(0, object.vertex_buffer.slice(..));
+                // set the index buffer
                 render_pass
                     .set_index_buffer(object.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 let num_indices =
                     object.index_buffer.size() as u32 / std::mem::size_of::<u16>() as u32;
+                // draw
                 render_pass.draw_indexed(0..num_indices, 0, 0..1);
             }
         }
@@ -139,6 +166,8 @@ impl Renderer {
         Ok(())
     }
 
+    /// Reconfigure the depth texture to the updated window state. \
+    /// Must update the window state first.
     pub fn resize(&mut self) {
         let device = &window_state().device;
         let config = &window_state().config;

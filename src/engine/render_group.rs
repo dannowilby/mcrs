@@ -1,3 +1,5 @@
+//! RenderGroups are used to hold specific render pipelines and their associated uniforms.
+
 use crate::engine::uniform::UniformLayout;
 
 use crate::window_state;
@@ -7,6 +9,9 @@ use wgpu::{
     ShaderModule, ShaderModuleDescriptor, ShaderSource, TextureFormat, VertexBufferLayout,
 };
 
+/// Used to build a RenderGroup.
+/// Add uniforms with the [.with()](RenderGroupBuilder::with) method. \
+/// Can only be constructed with one shader and one vertex format.
 pub struct RenderGroupBuilder<'a> {
     vertex_format: Option<VertexBufferLayout<'a>>,
     uniforms: Vec<UniformLayout>,
@@ -14,16 +19,9 @@ pub struct RenderGroupBuilder<'a> {
     shader: Option<ShaderModule>,
 }
 
-///
-///  let rgb = RenderGroupBuilder::new()
-///  rgb.shader();
-///  rgb.vertex_format();
-///  rgb.with();
-///  let render_group = rgb.build();
-///
-///  Used to build a RenderGroup
-///  Uses
+
 impl<'a> RenderGroupBuilder<'a> {
+    /// Create a new RenderGroupBuilder with empty fields.
     pub fn new() -> Self {
         RenderGroupBuilder {
             vertex_format: None,
@@ -33,6 +31,7 @@ impl<'a> RenderGroupBuilder<'a> {
         }
     }
 
+    /// Set the shader for the render group. Takes in the shader source as a `&str`.
     pub fn shader(mut self, source: &str) -> Self {
         let shader = window_state()
             .device
@@ -45,17 +44,20 @@ impl<'a> RenderGroupBuilder<'a> {
         self
     }
 
+    /// Set the vertex format with a [VertexBufferLayout](wgpu::VertexBufferLayout).
     pub fn vertex_format(mut self, format: VertexBufferLayout<'a>) -> Self {
         self.vertex_format = Some(format);
         self
     }
 
+    /// Add a uniform to the group. Must pass in a string id and a [UniformLayout](super::uniform::UniformLayout).
     pub fn with(mut self, uniform_name: &str, layout: UniformLayout) -> Self {
         self.uniforms.push(layout);
         self.uniform_names.push(uniform_name.to_owned());
         self
     }
 
+    /// Consume the builder and return a built render group. Will panic if no vertex format or shader set.
     pub fn build(self) -> RenderGroup {
         let layouts: Vec<&BindGroupLayout> = self.uniforms.iter().map(|x| &x.layout).collect();
 
@@ -129,6 +131,7 @@ impl<'a> RenderGroupBuilder<'a> {
     }
 }
 
+/// Holds a list of associated uniforms and a render pipeline.
 pub struct RenderGroup {
     pub pipeline: RenderPipeline,
     pub uniforms: Vec<String>,

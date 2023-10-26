@@ -1,9 +1,13 @@
+//! Used to store a game object's rendering information.
+
 use std::collections::HashMap;
 use wgpu::Buffer;
 
 use crate::engine::uniform::Uniform;
 use crate::window_state;
 
+/// Stores the id of its associated [render group](super::render_group::RenderGroup), a vertex and index buffer,
+/// and this render object's associated uniforms.
 #[derive(Debug)]
 pub struct RenderObject {
     pub render_group: String,
@@ -13,6 +17,7 @@ pub struct RenderObject {
 }
 
 impl RenderObject {
+    /// Create a new render object with bind group id, vertex and index buffer.
     pub fn new(bind_group: &str, vertices: &[u8], indices: &[u8]) -> Self {
         use wgpu::util::DeviceExt;
         let device = &window_state().device;
@@ -34,6 +39,7 @@ impl RenderObject {
         }
     }
 
+    /// Update the render object's buffers. Writes the buffers using the WGPU device.
     #[allow(dead_code)]
     pub fn set_buffers(&mut self, vertices: &[u8], indices: &[u8]) {
         use wgpu::util::DeviceExt;
@@ -54,7 +60,6 @@ impl RenderObject {
         self.index_buffer = index_buffer;
     }
 
-    #[allow(dead_code)]
     pub fn set_uniform(&mut self, uniform_name: &str, uniform: Uniform) {
         self.uniforms.insert(uniform_name.to_owned(), uniform);
     }

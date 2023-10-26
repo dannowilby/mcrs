@@ -1,3 +1,5 @@
+//! Used to encapsulate and load textures.
+
 use anyhow::*;
 use image::GenericImageView;
 
@@ -9,6 +11,9 @@ use crate::{
     window_state,
 };
 
+/// For a texture we need the [texture](wgpu::Texture), [view](wgpu::TextureView), and [sampler](wgpu::Sampler)
+/// so that we can use it in our shaders. Currently, all textures are loaded using `RGB8` and only use the 
+/// `NEAREST` filter and `REPEAT` address mode.
 #[derive(Debug)]
 pub struct Texture {
     pub texture: wgpu::Texture,
@@ -17,11 +22,13 @@ pub struct Texture {
 }
 
 impl Texture {
+    /// Create a Texture struct from image bytes.
     pub fn from_bytes(bytes: &[u8], label: &str) -> Result<Self> {
         let img = image::load_from_memory(bytes)?;
         Self::from_image(&img, Some(label))
     }
 
+    /// Create a texture from [loaded image](image::DynamicImage).
     pub fn from_image(img: &image::DynamicImage, label: Option<&str>) -> Result<Self> {
         let device = &window_state().device;
         let queue = &window_state().queue;
@@ -79,6 +86,7 @@ impl Texture {
         })
     }
 
+    /// Depth texture format.
     pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float; // 1.
 
     pub fn create_depth_texture(
@@ -127,6 +135,7 @@ impl Texture {
         }
     }
 
+    /// Create a uniform layout for the texture.
     pub fn create_layout(location: u32) -> UniformLayout {
         let device = &window_state().device;
         UniformLayout {
@@ -155,6 +164,7 @@ impl Texture {
         }
     }
 
+    /// Consume the Texture struct and return a [Uniform](Uniform).
     pub fn uniform(self, layout: &UniformLayout) -> Uniform {
         let device = &window_state().device;
 
@@ -180,8 +190,9 @@ impl Texture {
         }
     }
 
+    /// Create a Texture from the specified file. Will only check in the `assets` folder.
     pub async fn load(src: &str) -> Self {
-        let texture_bytes = load_binary(src)
+        let texture_bytes = load_binary(src, true)
             .await
             .expect(&format!("Error loading binary file: {}", src));
         Texture::from_bytes(texture_bytes.as_slice(), src)

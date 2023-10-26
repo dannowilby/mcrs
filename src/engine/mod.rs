@@ -1,7 +1,6 @@
 pub mod game_state;
 pub mod input;
 pub mod matrix;
-pub mod noise;
 pub mod render_group;
 pub mod render_object;
 pub mod renderer;
