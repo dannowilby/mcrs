@@ -61,18 +61,17 @@ pub fn mesh_chunk(chunk: &ChunkData, config: &ChunkConfig, _lod: LOD) -> RenderO
 
     // loop over all blocks stored
     for (position, block_id) in chunk.iter() {
-
         // check for the boundary that we generated
         // and don't want to mesh
         if !should_mesh_block(config, position) {
             continue;
         }
-        
+
         let block = config.dict.get(block_id);
         let model = block.unwrap_or(config.dict.get(&0).unwrap()).model;
         model(&chunk, config, position, &mut vertices, &mut indices);
     }
-    
+
     RenderObject::new(
         "chunk_render_group",
         bytemuck::cast_slice(vertices.as_slice()),

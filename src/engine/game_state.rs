@@ -1,23 +1,24 @@
 use std::collections::HashMap;
 
 use crate::engine::input::Input;
-use crate::engine::renderer::Renderer;
 use crate::window_state_mut;
 use winit::dpi::PhysicalSize;
 
+use super::render::renderer::Renderer;
+
 /// Used by the game state struct to more ergonomically refer to its systems.
-pub type System<D, E> = fn(&mut Renderer, &mut Input, &mut D, &mut Vec<E>, f64);
+pub type System<D, R, E> = fn(&mut R, &mut Input, &mut D, &mut Vec<E>, f64);
 
 /// Stores all the systems, event queues, delta, input, renderer, and systems for the game state. \
 /// ```D``` is the game state data, there are no restrictions on what this can be. \
 /// ```E``` is the enum of Events, has to be hashable.
-pub struct GameState<D, E>
+pub struct GameState<D, R: Renderer<D>, E>
 where
     E: PartialEq + Eq + std::hash::Hash,
 {
     pub data: D,
-    pub renderer: Renderer,
-    systems: HashMap<E, Vec<System<D, E>>>,
+    pub renderer: R,
+    systems: HashMap<E, Vec<System<D, R, E>>>,
     queue: [Vec<E>; 2],
     plex: usize,
     pub delta: f64,
@@ -25,12 +26,13 @@ where
     pub input: Input,
 }
 
-impl<D, E> GameState<D, E>
+impl<D, R, E> GameState<D, R, E>
 where
     E: PartialEq + Eq + std::hash::Hash,
+    R: Renderer<D>,
 {
     /// Make a new game state from a renderer and game data.
-    pub fn new(renderer: Renderer, data: D) -> Self {
+    pub fn new(renderer: R, data: D) -> Self {
         Self {
             data,
             systems: Default::default(),
@@ -45,14 +47,14 @@ where
 
     /// Updates the window state surface and calls the resize method on the renderer.
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
-    // must set window_state to new size since
-    // renderer reads from it
+        // must set window_state to new size since
+        // renderer reads from it
         window_state_mut().resize(new_size);
         self.renderer.resize();
     }
 
     /// Add a new system for the corresponding event.
-    pub fn add_system(&mut self, event: E, system: System<D, E>) {
+    pub fn add_system(&mut self, event: E, system: System<D, R, E>) {
         self.systems
             .entry(event)
             .and_modify(|storage| storage.push(system))

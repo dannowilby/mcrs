@@ -1,7 +1,7 @@
 use crate::engine::input::Input;
 use crate::engine::matrix::Matrix;
-use crate::engine::renderer::Renderer;
 use crate::world::{Event, GameData};
+use crate::world_renderer::WorldRenderer;
 
 use super::collision::calculate_collider;
 use super::generation::load_chunk;
@@ -12,26 +12,22 @@ use super::{calc_lod, chunk_id, chunk_position, player_to_position};
 // - Frustrum culling
 // - Occulsion culling
 pub fn load_world(
-    renderer: &mut Renderer,
+    renderer: &mut WorldRenderer,
     _input: &mut Input,
     data: &mut GameData,
     _queue: &mut Vec<Event>,
     _delta: f64,
 ) {
     let thread_pool = &data.thread_pool;
-    
+
     let mut position = (0, 0, 0);
     if let Some(player) = data.physics_engine.get_rigid_body("player".to_string()) {
         let player_pos = player.translation();
         position = player_to_position(&(player_pos.x, player_pos.y, player_pos.z));
     }
-    
-    
+
     // chunk loading dimensions
-    let (i, j, k) = chunk_position(
-        &data.chunk_config,
-        &position,
-    );
+    let (i, j, k) = chunk_position(&data.chunk_config, &position);
     let radius = data.chunk_config.load_radius as i32;
 
     let mut chunks_to_remove: Vec<String> =
@@ -79,19 +75,19 @@ pub fn load_world(
     for c in chunks_to_remove {
         data.loaded_chunks.remove(&c);
         data.physics_engine.remove_collider(&c);
-        renderer.remove_object(&c);
+        renderer.object_render_pass.render_objects.remove(&c);
     }
 }
 
 pub fn check_done_load_world(
-    renderer: &mut Renderer,
+    renderer: &mut WorldRenderer,
     _input: &mut Input,
     data: &mut GameData,
     _queue: &mut Vec<Event>,
     _delta: f64,
 ) {
     let mut done_loading = data.done_loading.lock(0).unwrap();
-    for (chunk_id, (chunk_pos, chunk, mesh, collider)) in done_loading.drain() {
+    for (chunk_id, (chunk_pos, chunk, mut mesh, collider)) in done_loading.drain() {
         data.loading.remove(&chunk_id);
         data.loaded_chunks.insert(chunk_id.clone(), chunk);
         data.physics_engine
@@ -103,7 +99,10 @@ pub fn check_done_load_world(
             z as f32 * data.chunk_config.depth as f32,
         )))
         .uniform(&Matrix::create_layout(2));
-        renderer.add_object(&chunk_id, mesh);
-        renderer.set_object_uniform(&chunk_id, "model", mat);
+        mesh.uniforms.insert("model".to_string(), mat);
+        renderer
+            .object_render_pass
+            .render_objects
+            .insert(chunk_id, mesh);
     }
 }

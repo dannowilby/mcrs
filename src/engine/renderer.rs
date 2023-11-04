@@ -1,14 +1,16 @@
 //! Used to encasuplate WGPU rendering functions. \
 //! Used to store global uniforms, a common depth texture, and the following: \
 //! [Render groups](super::render_group::RenderGroup) contain the layout data for render objects to be rendererd. \
-//! [Render objects](super::render_object::RenderObject) contain mesh data and uniform data for that object.
+//! [Render objects](super::render_object::RenderObject) contain mesh data and uniform data for that object. \
+//! There is no programmatic way to specify separate render passes yet, and as a result the ImGui instance is thrown in here.
 
 use std::collections::HashMap;
 
 use crate::window_state;
 
 use super::{
-    render_group::RenderGroup, render_object::RenderObject, texture::Texture, uniform::Uniform,
+    imgui::ImGui, render_group::RenderGroup, render_object::RenderObject, texture::Texture,
+    uniform::Uniform,
 };
 
 /// The idea behind this struct is that we register the things we want to
@@ -19,11 +21,11 @@ pub struct Renderer {
     render_objects: HashMap<String, RenderObject>,
     uniforms: HashMap<String, Uniform>,
     depth_texture: Texture,
+    pub imgui: ImGui,
 }
 
 impl Renderer {
-    
-    /// Create a new Renderer. 
+    /// Create a new Renderer.
     pub fn new() -> Self {
         let device = &window_state().device;
         let config = &window_state().config;
@@ -32,6 +34,7 @@ impl Renderer {
             render_objects: HashMap::new(),
             uniforms: HashMap::new(),
             depth_texture: Texture::create_depth_texture(&device, &config, "depth_texture"),
+            imgui: ImGui::new(),
         }
     }
 
@@ -44,7 +47,7 @@ impl Renderer {
 
     /// Add a render object into the renderer.
     /// The render group associated with this must also be added to the renderer
-    /// otherwise the render method will panic. 
+    /// otherwise the render method will panic.
     pub fn add_object(&mut self, id: &str, object: RenderObject) {
         self.render_objects.insert(id.to_owned(), object);
     }
@@ -74,7 +77,7 @@ impl Renderer {
         self.render_objects.get_mut(id)
     }
 
-    /// Set a uniform that will be used in all render groups. 
+    /// Set a uniform that will be used in all render groups.
     pub fn set_global_uniform(&mut self, uniform_name: &str, uniform: Uniform) {
         self.uniforms.insert(uniform_name.to_owned(), uniform);
     }
@@ -85,20 +88,16 @@ impl Renderer {
     }
 
     /// Render all added render objects.
-    pub fn render(&self) -> Result<(), wgpu::SurfaceError> {
-        let device = &window_state().device;
+    pub fn render(&mut self, delta: f64) -> Result<(), wgpu::SurfaceError> {
+        let mut encoder: wgpu::CommandEncoder = window_state()
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
         let surface = &window_state().surface;
-        let queue = &window_state().queue;
-
-        let output = surface.get_current_texture()?;
+        let output = surface.get_current_texture().unwrap();
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
-
+        // main chunks render pass
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -142,7 +141,10 @@ impl Renderer {
                     let uniform = match global_uniform {
                         Some(x) => x,
                         // if not a global uniform, then it's a object uniform
-                        None => object.uniforms.get(uniform_name).expect(&format!("Uniform {} not specified", uniform_name)) 
+                        None => object
+                            .uniforms
+                            .get(uniform_name)
+                            .expect(&format!("Uniform {} not specified", uniform_name)),
                     };
 
                     // set the uniform
@@ -161,8 +163,12 @@ impl Renderer {
             }
         }
 
-        queue.submit(std::iter::once(encoder.finish()));
+        let _ = self.imgui.render(&view, &mut encoder, delta);
+        window_state()
+            .queue
+            .submit(std::iter::once(encoder.finish()));
         output.present();
+
         Ok(())
     }
 

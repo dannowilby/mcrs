@@ -5,8 +5,9 @@ use rapier3d::prelude::*;
 use std::collections::HashMap;
 
 use crate::{
-    engine::{input::Input, renderer::Renderer},
+    engine::input::Input,
     world::{Event, GameData},
+    world_renderer::WorldRenderer,
 };
 
 pub struct PhysicsEngine {
@@ -16,7 +17,7 @@ pub struct PhysicsEngine {
     colliders_handles: HashMap<String, ColliderHandle>,
     rigidbody_handles: HashMap<String, RigidBodyHandle>,
 
-    gravity: Vector<Real>,
+    pub gravity: Vector<Real>,
 
     integration_parameters: IntegrationParameters,
     island_manager: IslandManager,
@@ -51,12 +52,18 @@ impl PhysicsEngine {
             pipeline: PhysicsPipeline::new(),
         }
     }
-    
+
     pub fn insert_entity(&mut self, id: &str, rigidbody: RigidBody, collider: Collider) {
         let rigid_body_handle = self.rigidbody_set.insert(rigidbody);
-        self.rigidbody_handles.insert(String::from(id), rigid_body_handle);
-        let collider_handle = self.collider_set.insert_with_parent(collider, rigid_body_handle, &mut self.rigidbody_set);
-        self.colliders_handles.insert(String::from(id), collider_handle);
+        self.rigidbody_handles
+            .insert(String::from(id), rigid_body_handle);
+        let collider_handle = self.collider_set.insert_with_parent(
+            collider,
+            rigid_body_handle,
+            &mut self.rigidbody_set,
+        );
+        self.colliders_handles
+            .insert(String::from(id), collider_handle);
     }
 
     pub fn insert_collider(&mut self, id: String, collider: Collider) {
@@ -94,7 +101,7 @@ impl PhysicsEngine {
         let handle = self.rigidbody_handles.get(&id)?;
         self.rigidbody_set.get_mut(handle.clone())
     }
-    
+
     pub fn remove_rigid_body(&mut self, id: &str) {
         if let Some(handle) = self.rigidbody_handles.get(id) {
             self.rigidbody_set.remove(
@@ -108,7 +115,8 @@ impl PhysicsEngine {
         }
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self, delta: f64) {
+        self.integration_parameters.dt = (delta / 1000.0) as f32;
         self.pipeline.step(
             &self.gravity,
             &self.integration_parameters,
@@ -125,10 +133,10 @@ impl PhysicsEngine {
             &(),
         );
     }
-    
+
     pub fn is_colliding(&self, id: &str) -> bool {
         let handle = self.colliders_handles.get(id);
-       
+
         if let Some(handle) = handle {
             for i in self.narrow_phase.contacts_with(handle.clone()) {
                 if i.has_any_active_contact {
@@ -136,17 +144,17 @@ impl PhysicsEngine {
                 }
             }
         }
-        
-        false 
+
+        false
     }
 }
 
 pub fn simulate_physics(
-    _renderer: &mut Renderer,
+    _renderer: &mut WorldRenderer,
     _input: &mut Input,
     data: &mut GameData,
     _queue: &mut Vec<Event>,
     delta: f64,
 ) {
-    data.physics_engine.step();
+    data.physics_engine.step(delta);
 }

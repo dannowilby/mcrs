@@ -7,6 +7,8 @@ mod physics;
 mod player;
 mod window;
 mod world;
+mod world_renderer;
+use crate::engine::render::renderer::Renderer;
 use crate::window::WindowState;
 
 #[cfg(target_arch = "wasm32")]
@@ -58,10 +60,12 @@ pub async fn run() {
     // init window
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
+    window.set_title("MCRS");
     init_window_state(window).await;
 
     // init game logic
     let mut game_state = world::init().await;
+
     // let state = state::GameState::<(), ()>::new(renderer, ());
 
     #[cfg(target_arch = "wasm32")]
@@ -83,60 +87,73 @@ pub async fn run() {
             .expect("Couldn't append canvas to document body.");
     }
 
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::WindowEvent {
-            window_id,
-            ref event,
-        } if window_id == window_state().window().id() => {
-            // calc frame delta
+    event_loop.run(move |event, _, control_flow| {
+        match event {
+            Event::WindowEvent {
+                window_id,
+                ref event,
+            } if window_id == window_state().window().id() => {
+                // calc frame delta
 
-            game_state.input.handle(event);
+                game_state.input.handle(event);
 
-            if true {
-                // !window_state.input(event) {
-                match event {
-                    WindowEvent::CloseRequested => control_flow.set_exit(),
-                    WindowEvent::Resized(physical_size) => {
-                        game_state.resize(*physical_size);
-                        game_state.queue_event(world::Event::Resized);
+                if true {
+                    // !window_state.input(event) {
+                    match event {
+                        WindowEvent::CloseRequested => control_flow.set_exit(),
+                        WindowEvent::Resized(physical_size) => {
+                            game_state.resize(*physical_size);
+                            game_state.queue_event(world::Event::Resized);
+                        }
+                        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                            game_state.resize(**new_inner_size);
+                            game_state.queue_event(world::Event::Resized);
+                        }
+                        _ => {}
                     }
-                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        game_state.resize(**new_inner_size);
-                        game_state.queue_event(world::Event::Resized);
-                    }
-                    _ => {}
                 }
             }
-        }
-        Event::DeviceEvent {
-            event: DeviceEvent::MouseMotion { delta },
-            ..
-        } => {
-            game_state.input.mouse_delta(delta);
-        }
-        Event::RedrawRequested(window_id) if window_id == window_state().window().id() => {
-            game_state.delta_end();
-            game_state.delta_start();
-
-            game_state.process_events();
-            game_state.queue_event(world::Event::Tick);
-
-            let res = game_state.renderer.render();
-            match res {
-                Ok(_) => {}
-                Err(wgpu::SurfaceError::Lost) => {
-                    let size = window_state().size;
-                    game_state.resize(size);
-                    game_state.queue_event(world::Event::Resized);
-                }
-                Err(wgpu::SurfaceError::OutOfMemory) => control_flow.set_exit(),
-                Err(e) => eprintln!("{:?}", e),
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion { delta },
+                ..
+            } => {
+                game_state.input.mouse_delta(delta);
             }
-        }
-        Event::MainEventsCleared => {
-            window_state().window().request_redraw();
-        }
-        _ => {}
+            Event::RedrawRequested(window_id) if window_id == window_state().window().id() => {
+                game_state.delta_end();
+                game_state.delta_start();
+
+                game_state.process_events();
+                game_state.queue_event(world::Event::Tick);
+
+                // encode the render passes
+                let _ = game_state
+                    .renderer
+                    .render(&mut game_state.data, game_state.delta);
+
+                // submit and draw
+
+                /*
+                match res {
+                    Ok(_) => {}
+                    Err(wgpu::SurfaceError::Lost) => {
+                        let size = window_state().size;
+                        game_state.resize(size);
+                        game_state.queue_event(world::Event::Resized);
+                    }
+                    Err(wgpu::SurfaceError::OutOfMemory) => control_flow.set_exit(),
+                    Err(e) => eprintln!("{:?}", e),
+                }
+                */
+            }
+            Event::MainEventsCleared => {
+                window_state().window().request_redraw();
+            }
+            _ => {}
+        };
+
+        // update input for imgui
+        game_state.renderer.handle_event(&event);
     })
 }
 

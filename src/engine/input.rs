@@ -6,7 +6,7 @@ use winit::event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode, Win
 
 use crate::window_state;
 
-/// Struct used to track how long a key or mouse button has been pressed. Also 
+/// Struct used to track how long a key or mouse button has been pressed. Also
 /// stores mouse movement delta and whether or not the window is focused.
 pub struct Input {
     pub is_focused: bool,
@@ -44,7 +44,7 @@ impl Input {
         return 0.0;
     }
 
-    /// Process window event to update what keys or mouse buttons are pressed. 
+    /// Process window event to update what keys or mouse buttons are pressed.
     pub fn handle(&mut self, event: &WindowEvent) {
         self.mouse_event(event);
         self.keyboard_event(event);

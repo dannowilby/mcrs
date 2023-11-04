@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// For a texture we need the [texture](wgpu::Texture), [view](wgpu::TextureView), and [sampler](wgpu::Sampler)
-/// so that we can use it in our shaders. Currently, all textures are loaded using `RGB8` and only use the 
+/// so that we can use it in our shaders. Currently, all textures are loaded using `RGB8` and only use the
 /// `NEAREST` filter and `REPEAT` address mode.
 #[derive(Debug)]
 pub struct Texture {

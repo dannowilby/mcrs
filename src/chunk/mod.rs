@@ -10,7 +10,6 @@ pub mod loading;
 pub mod meshing;
 use block::BlockDictionary;
 
-
 /// We load chunks by an area of
 /// depth + 2 * depth + 2 * depth + 2
 /// but then only mesh the inside of the chunk

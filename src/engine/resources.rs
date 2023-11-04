@@ -1,6 +1,6 @@
 //! Used to load resources, changes load location based on target. \
 //! If target is `"wasm32"`, then load location will be the server. Otherwise
-//! it will load from the filesystem. 
+//! it will load from the filesystem.
 
 use cfg_if::cfg_if;
 
@@ -19,7 +19,7 @@ fn format_url(file_folder: &str, file_name: &str) -> reqwest::Url {
     base.join(file_name).unwrap()
 }
 
-/// Loads a string. If `is_asset` is true, then it will only load from the `assets` folder. 
+/// Loads a string. If `is_asset` is true, then it will only load from the `assets` folder.
 pub async fn load_string(file_name: &str, is_asset: bool) -> anyhow::Result<String> {
     let mut parent_path = "";
     if is_asset {
@@ -45,12 +45,11 @@ pub async fn load_string(file_name: &str, is_asset: bool) -> anyhow::Result<Stri
 
 /// Loads a binary. If `is_asset` is true, then it will only load from the `assets` folder.
 pub async fn load_binary(file_name: &str, is_asset: bool) -> anyhow::Result<Vec<u8>> {
-    
     let mut parent_path = "";
     if is_asset {
         parent_path = ASSET_FOLDER;
     }
-    
+
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             let url = format_url(parent_path, file_name);

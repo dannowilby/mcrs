@@ -70,8 +70,8 @@ pub fn get_terrain_at(config: &ChunkConfig, global_position: [i32; 3]) -> f64 {
         config.noise_amplitude.2 * global_position[2] as f64,
     ];
     (&config.noise).sample(noise_position)
-        + ground_threshold(config, global_position[1])
-        + island_threshold(config, global_position)
+    // + ground_threshold(config, global_position[1])
+    // + island_threshold(config, global_position)
 }
 
 pub fn generate_terrain(config: &ChunkConfig, pos: &Position, output: &mut ChunkData) {

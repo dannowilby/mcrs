@@ -19,7 +19,6 @@ pub struct RenderGroupBuilder<'a> {
     shader: Option<ShaderModule>,
 }
 
-
 impl<'a> RenderGroupBuilder<'a> {
     /// Create a new RenderGroupBuilder with empty fields.
     pub fn new() -> Self {
