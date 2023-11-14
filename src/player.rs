@@ -6,20 +6,20 @@ use crate::{
         input::Input,
         uniform::{Uniform, UniformData},
     },
+    physics::PhysicsEngine,
     window_state,
     world::{Event, GameData},
     world_renderer::WorldRenderer,
 };
 
 pub struct Player {
-    yaw: f32,
-    pitch: f32,
+    pub yaw: f32,
+    pub pitch: f32,
     pub fov: f32,
-    move_speed: f32,
+    pub move_speed: f32,
     pub max_jump: f32,
     sensitivity: f32,
     pub is_flying: bool,
-    is_airborne: bool,
 }
 
 impl Player {
@@ -27,12 +27,11 @@ impl Player {
         Self {
             yaw: 0.0,
             pitch: 0.0,
-            fov: 1.0472,
-            move_speed: 1.5,
-            max_jump: 15.0,
+            fov: 1.22173,
+            move_speed: 4.0,
+            max_jump: 1.25,
             sensitivity: 0.2,
             is_flying: true,
-            is_airborne: false,
         }
     }
 }
@@ -45,30 +44,27 @@ pub fn create_player(data: &mut GameData, pos: &Position) {
         .enabled_rotations(false, false, false)
         .build();
     rigidbody.set_position(translation, true);
-    let collider = ColliderBuilder::capsule_y(0.75, 0.25).build();
+    let collider = ColliderBuilder::cylinder(0.75, 0.25).friction(0.0).build();
     data.physics_engine
         .insert_entity("player", rigidbody, collider);
 }
 
 /// Check if the player is on the ground.
-fn on_ground<'a>(
-    config: &'a ChunkConfig,
-    loaded_chunks: &'a ChunkStorage,
-    pos: &'a Vector<Real>,
-) -> bool {
-    if f32::fract(pos.y) > 0.5 || f32::fract(pos.y) < 0.48 {
-        return false;
+fn on_ground(physics_engine: &PhysicsEngine) -> bool {
+    if let Some(handle) = physics_engine.get_collider_handle("player") {
+        for i in physics_engine.narrow_phase.contacts_with(handle.clone()) {
+            if i.has_any_active_contact {
+                for manifold in &i.manifolds {
+                    let p = manifold.local_n1;
+                    // bottom of player model is touching something
+                    if p.eq(&vector![0.0, -1.0, 0.0]) {
+                        return true;
+                    }
+                }
+            }
+        }
     }
-    let block_id = get_block(
-        config,
-        loaded_chunks,
-        &(pos.x as i32, f32::round(pos.y) as i32 - 1, pos.z as i32),
-    );
-    !config
-        .dict
-        .get(&block_id)
-        .unwrap_or(&Default::default())
-        .transparent
+    false
 }
 
 /// Get the velocity from player input.
@@ -86,22 +82,23 @@ fn calculate_player_input_velocity(input: &Input, player: &Player, delta: f64) -
     let space = input.get_key(winit::event::VirtualKeyCode::Space);
     let shift = input.get_key(winit::event::VirtualKeyCode::LShift);
     if s > 0.0 {
-        pos -= forward * move_speed * delta as f32;
+        pos -= forward * move_speed; //* delta as f32;
     }
     if w > 0.0 {
-        pos += forward * move_speed * delta as f32;
+        pos += forward * move_speed; // * delta as f32;
     }
     if a > 0.0 {
-        pos -= right * move_speed * delta as f32;
+        pos -= right * move_speed; // * delta as f32;
     }
     if d > 0.0 {
-        pos += right * move_speed * delta as f32;
+        pos += right * move_speed; // * delta as f32;
     }
-    if space > 0.0 && space <= delta {
+    if space > 0.0 {
+        // && space <= delta {
         pos.y += move_speed * player.max_jump;
     }
     if shift > 0.0 {
-        pos.y -= move_speed * delta as f32;
+        pos.y -= move_speed;
     }
 
     pos
@@ -129,25 +126,6 @@ pub fn simulate_player(
     }
 }
 
-/// Merge player input and physics velocity to get the next total velocity.
-fn calculate_player_velocity(
-    input_vel: glam::Vec3,
-    physics_vel: glam::Vec3,
-    player: &Player,
-) -> Vector<Real> {
-    if player.is_flying {
-        return vector![input_vel.x, input_vel.y, input_vel.z];
-    }
-
-    let mut up_vel = physics_vel.y;
-    if !player.is_airborne && input_vel.y > 0.0 {
-        up_vel += input_vel.y;
-        // up_vel = f32::min(up_vel, player.max_jump);
-    }
-
-    vector![input_vel.x, up_vel, input_vel.z]
-}
-
 /// System for updating player movement with input.
 pub fn player_input(
     _renderer: &mut WorldRenderer,
@@ -161,27 +139,29 @@ pub fn player_input(
         return;
     }
 
-    // get input
     let input_vel = calculate_player_input_velocity(input, &data.player, delta);
-    // get physics data
-    let is_colliding = data.physics_engine.is_colliding("player");
+    let physics_vel = data
+        .physics_engine
+        .get_mut_rigid_body("player".to_string())
+        .unwrap()
+        .linvel();
+    let mut output_vel = vector!(input_vel.x, physics_vel.y, input_vel.z);
+
+    if on_ground(&data.physics_engine) {
+        output_vel.y += input_vel.y;
+    }
+
+    if data.player.is_flying {
+        output_vel.x = input_vel.x;
+        output_vel.y = input_vel.y;
+        output_vel.z = input_vel.z;
+    }
+
     let player = data
         .physics_engine
         .get_mut_rigid_body("player".to_string())
         .unwrap();
-    // update is_airborne
-    data.player.is_airborne = !is_colliding
-        && !on_ground(
-            &data.chunk_config,
-            &data.loaded_chunks,
-            player.translation(),
-        );
-
-    let physics_vel = glam::Vec3::new(player.linvel().x, player.linvel().y, player.linvel().z);
-    player.set_linvel(
-        calculate_player_velocity(input_vel, physics_vel, &data.player),
-        true,
-    );
+    player.set_linvel(output_vel, true);
 
     // change look direction
     if input.movement.0 != 0.0 || input.movement.1 != 0.0 {
@@ -213,7 +193,7 @@ pub fn update_camera(
     if let Some(Uniform {
         data: UniformData::Matrix(m),
         ..
-    }) = renderer.object_render_pass.uniforms.get_mut("view")
+    }) = renderer.chunk_render_pass.uniforms.get_mut("view")
     {
         let mat = m.matrix();
 
@@ -249,7 +229,7 @@ pub fn update_perspective(
     if let Some(Uniform {
         data: UniformData::Matrix(m),
         ..
-    }) = renderer.object_render_pass.uniforms.get_mut("projection")
+    }) = renderer.chunk_render_pass.uniforms.get_mut("projection")
     {
         let config = &window_state().config;
         let mat = m.matrix();
@@ -265,7 +245,7 @@ pub fn update_perspective(
 
 /// System for tracking if the user is actively using the window.
 pub fn focus_window(
-    renderer: &mut WorldRenderer,
+    _renderer: &mut WorldRenderer,
     input: &mut Input,
     data: &mut GameData,
     _queue: &mut Vec<Event>,

@@ -4,6 +4,7 @@ use crate::world::{Event, GameData};
 use crate::world_renderer::WorldRenderer;
 
 use super::collision::calculate_collider;
+use super::culling::VisibilityGraph;
 use super::generation::load_chunk;
 use super::meshing::mesh_chunk;
 use super::{calc_lod, chunk_id, chunk_position, player_to_position};
@@ -36,7 +37,7 @@ pub fn load_world(
     let mut chunks_to_load = Vec::new();
     // calculate chunks to modify
     for x in (i - radius)..(i + radius) {
-        for y in (j - radius)..(j + radius) {
+        for y in (j - 2)..(j + 2) {
             for z in (k - radius)..(k + radius) {
                 let chunk_id = chunk_id(&(x, y, z));
 
@@ -63,11 +64,15 @@ pub fn load_world(
             let chunk = load_chunk(&config, &chunk_pos);
             let mesh = mesh_chunk(&chunk, &config, calc_lod());
             let collider = calculate_collider(&chunk, &chunk_pos, &config);
+            let visibility_graph = VisibilityGraph::from_chunk(&config, &chunk);
 
             // collider.set_translation(translation);
 
             let mut done_loading = done_loading.lock(5).unwrap();
-            done_loading.insert(chunk_id, (chunk_pos, chunk, mesh, collider));
+            done_loading.insert(
+                chunk_id,
+                (chunk_pos, chunk, visibility_graph, mesh, collider),
+            );
         })
     }
 
@@ -75,7 +80,7 @@ pub fn load_world(
     for c in chunks_to_remove {
         data.loaded_chunks.remove(&c);
         data.physics_engine.remove_collider(&c);
-        renderer.object_render_pass.render_objects.remove(&c);
+        renderer.chunk_render_pass.render_objects.remove(&c);
     }
 }
 
@@ -87,9 +92,12 @@ pub fn check_done_load_world(
     _delta: f64,
 ) {
     let mut done_loading = data.done_loading.lock(0).unwrap();
-    for (chunk_id, (chunk_pos, chunk, mut mesh, collider)) in done_loading.drain() {
+    for (chunk_id, (chunk_pos, chunk, visibility_graph, mut mesh, collider)) in done_loading.drain()
+    {
         data.loading.remove(&chunk_id);
         data.loaded_chunks.insert(chunk_id.clone(), chunk);
+        data.visibility_graphs
+            .insert(chunk_id.clone(), visibility_graph);
         data.physics_engine
             .insert_collider(chunk_id.clone(), collider);
         let (x, y, z) = chunk_pos;
@@ -101,7 +109,7 @@ pub fn check_done_load_world(
         .uniform(&Matrix::create_layout(2));
         mesh.uniforms.insert("model".to_string(), mat);
         renderer
-            .object_render_pass
+            .chunk_render_pass
             .render_objects
             .insert(chunk_id, mesh);
     }

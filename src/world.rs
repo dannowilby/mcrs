@@ -1,13 +1,19 @@
 use priomutex::Mutex;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::chunk::block::{Block, BlockDictionary};
+use crate::chunk::chunk_id;
+use crate::chunk::chunk_position;
 use crate::chunk::cube_model::cube_model;
+use crate::chunk::culling::VisibilityGraph;
+use crate::chunk::culling::VisibilityGraphStorage;
 use crate::chunk::loading::check_done_load_world;
 use crate::chunk::loading::load_world;
 use crate::chunk::meshing;
+use crate::chunk::player_to_position;
 use crate::chunk::ChunkConfig;
 use crate::chunk::ChunkData;
 use crate::chunk::ChunkStorage;
@@ -46,9 +52,11 @@ pub struct GameData {
 
     // chunks
     pub loaded_chunks: ChunkStorage,
+    pub visibility_graphs: VisibilityGraphStorage,
 
     pub loading: HashSet<String>,
-    pub done_loading: Arc<Mutex<HashMap<String, (Position, ChunkData, RenderObject, Collider)>>>,
+    pub done_loading:
+        Arc<Mutex<HashMap<String, (Position, ChunkData, VisibilityGraph, RenderObject, Collider)>>>,
 
     // physics
     pub physics_engine: PhysicsEngine,
@@ -60,6 +68,8 @@ pub struct GameData {
     pub player: Player,
     time: f64,
     frames: f64,
+    pub drawn_chunks: u64,
+    pub chunks_removed_by_visibility: u64,
     pub focused: bool,
 }
 
@@ -74,6 +84,8 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
 
             // chunk_data: HashMap::new(),
             loaded_chunks: ChunkStorage::new(),
+            visibility_graphs: VisibilityGraphStorage::new(),
+
             loading: HashSet::new(),
             done_loading: Arc::new(Mutex::new(HashMap::new())),
 
@@ -82,17 +94,10 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
             thread_pool: rayon::ThreadPoolBuilder::new().build().unwrap(),
 
             chunk_config: Arc::new(ChunkConfig {
-                noise: Source::simplex(seed) // start with simplex noise
-                    .fbm(5, 0.013, 2.0, 0.5) // apply fractal brownian motion
-                    .blend(
-                        // apply blending...
-                        Source::worley(43).scale([0.05, 0.05, 0.05]), // ...with scaled worley noise
-                        Source::worley(44).scale([0.02, 0.02, 0.02]),
-                    ) // ...controlled by other worley noise
-                    .lambda(|f| (f * 2.0).sin() * 0.3 + f * 0.7), // apply a closure to the noise Source::worley(123), //Arc.fbm(3, 0.013, 2.0, 0.5); // ::new(Worley::new(0)), // |[x, y, z]| f64::sin(x) + f64::sin(y) + f64::sin(z),
-                noise_amplitude: (0.5, 0.5, 0.5),
-                depth: 8,
-                load_radius: 2,
+                noise: Source::simplex(seed), // apply a closure to the noise Source::worley(123), //Arc.fbm(3, 0.013, 2.0, 0.5); // ::new(Worley::new(0)), // |[x, y, z]| f64::sin(x) + f64::sin(y) + f64::sin(z),
+                noise_amplitude: (0.01, 0.01, 0.01),
+                depth: 16,
+                load_radius: 8,
 
                 uv_size: 0.0625,
                 dict: BlockDictionary::from([
@@ -128,6 +133,8 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
             }),
 
             player: Player::new(),
+            drawn_chunks: 0,
+            chunks_removed_by_visibility: 0,
             time: 0.0,
             frames: 0.0,
             focused: false,
@@ -137,7 +144,7 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
     let shader_source = load_string("chunk.wgsl", true)
         .await
         .expect("error loading shader... :(");
-    game_state.renderer.object_render_pass.render_groups.insert(
+    game_state.renderer.chunk_render_pass.render_groups.insert(
         "chunk_render_group".to_string(),
         RenderGroupBuilder::new()
             .with("projection", Matrix::create_layout(0))
@@ -150,7 +157,7 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
     );
 
     let texture_uniform = texture::Texture::load("texture_atlas.png").await;
-    game_state.renderer.object_render_pass.uniforms.insert(
+    game_state.renderer.chunk_render_pass.uniforms.insert(
         "texture_atlas".to_string(),
         texture_uniform.uniform(&texture::Texture::create_layout(3)),
     );
@@ -165,19 +172,19 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
     let proj = Matrix::new(projection).uniform(&Matrix::create_layout(0));
     game_state
         .renderer
-        .object_render_pass
+        .chunk_render_pass
         .uniforms
         .insert("projection".to_string(), proj);
 
     let camera = Matrix::new(glam::Mat4::IDENTITY).uniform(&Matrix::create_layout(1));
     game_state
         .renderer
-        .object_render_pass
+        .chunk_render_pass
         .uniforms
         .insert("view".to_string(), camera);
 
     // load player
-    create_player(&mut game_state.data, &(0, 103, 0));
+    create_player(&mut game_state.data, &(-15, 20, 0));
     update_camera(
         &mut game_state.renderer,
         &mut game_state.input,
@@ -189,6 +196,7 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
     game_state.add_system(Event::Init, load_world);
     game_state.add_system(Event::Tick, player_input);
     game_state.add_system(Event::Tick, debug);
+    // game_state.add_system(Event::Tick, visibility_cull);
     game_state.add_system(Event::Tick, focus_window);
     game_state.add_system(Event::Tick, toggle_debug_menu);
     // game_state.add_system(Event::Tick, cursor_lock);
@@ -232,8 +240,19 @@ fn debug(
                             game_data.physics_engine.is_colliding("player")
                         ));
                         ui.checkbox("Flying", &mut game_data.player.is_flying);
-                        ui.slider("Player jump power: ", 0.0, 50.0, &mut game_data.player.max_jump);
-                        ui.slider("Player gravity: ", -15.0, 0.0, &mut game_data.physics_engine.gravity.y);
+                        ui.slider(
+                            "Player jump power: ",
+                            0.0,
+                            50.0,
+                            &mut game_data.player.max_jump,
+                        );
+                        ui.slider(
+                            "Player gravity: ",
+                            -15.0,
+                            0.0,
+                            &mut game_data.physics_engine.gravity.y,
+                        );
+                        ui.slider("Player speed:", 0.0, 15.0, &mut game_data.player.move_speed);
                     });
                 ui.window("Statistics")
                     .size([400.0, 200.0], imgui::Condition::FirstUseEver)
@@ -243,6 +262,18 @@ fn debug(
 
                         ui.text(format!("FPS: {}", fps));
                         ui.text(format!("Frame delta: {}", d));
+                        ui.text(format!(
+                            "Chunks drawn this frame: {}",
+                            game_data.drawn_chunks
+                        ));
+                        ui.text(format!(
+                            "Num chunks removed because of visibility: {}",
+                            game_data.chunks_removed_by_visibility
+                        ));
+                        ui.text(format!(
+                            "Num loaded chunks: {}",
+                            game_data.loaded_chunks.len()
+                        ));
                         ui.text(format!(
                             "Number of chunks currently loading: {}",
                             game_data.loading.len()
@@ -254,7 +285,6 @@ fn debug(
 
     // update fps counter variables
     if data.time > 1000.0 {
-        // println!("{}", 1000.0 * data.frames / data.time);
         data.frames = 0.0;
         data.time = 0.0;
     }

@@ -76,6 +76,10 @@ impl<T> RenderPass<T> for ObjectRenderPass<T> {
             // encode the render commands
             // loop over all render objects
             for (_id, object) in self.render_objects.iter() {
+                if !object.visible {
+                    continue;
+                }
+
                 // get the render object's render group
                 let group = self.render_groups.get(&object.render_group).expect(
                     "Referenced a render group that does not exist! You are using this wrong!",

@@ -14,6 +14,7 @@ pub struct RenderObject {
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
     pub uniforms: HashMap<String, Uniform>,
+    pub visible: bool,
 }
 
 impl RenderObject {
@@ -36,6 +37,7 @@ impl RenderObject {
             vertex_buffer,
             index_buffer,
             uniforms: HashMap::new(),
+            visible: true,
         }
     }
 
@@ -58,9 +60,5 @@ impl RenderObject {
 
         self.vertex_buffer = vertex_buffer;
         self.index_buffer = index_buffer;
-    }
-
-    pub fn set_uniform(&mut self, uniform_name: &str, uniform: Uniform) {
-        self.uniforms.insert(uniform_name.to_owned(), uniform);
     }
 }

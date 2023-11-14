@@ -14,14 +14,32 @@ pub struct Block {
     pub uv: [f32; 2],
 }
 
+/// We provide two different implementations of the default block so we can
+/// have a default for the Block and &Block types
+
+const CONST_DEFAULT_BLOCK: Block = Block {
+    model: |_, _, _, _, _| {},
+    transparent: true,
+    ident: String::new(),
+    uv: [0.0, 0.0],
+};
+
+static STATIC_DEFAULT_BLOCK: Block = Block {
+    model: |_, _, _, _, _| {},
+    transparent: true,
+    ident: String::new(),
+    uv: [0.0, 0.0],
+};
+
 impl Default for Block {
     fn default() -> Self {
-        Block {
-            model: |_, _, _, _, _| {},
-            transparent: true,
-            ident: "air".to_owned(),
-            uv: [0.0, 0.0],
-        }
+        CONST_DEFAULT_BLOCK
+    }
+}
+
+impl Default for &Block {
+    fn default() -> Self {
+        &STATIC_DEFAULT_BLOCK
     }
 }
 

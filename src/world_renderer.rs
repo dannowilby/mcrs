@@ -1,5 +1,6 @@
 use winit::event::{Event, VirtualKeyCode};
 
+use crate::chunk::chunk_renderer::ChunkRenderPass;
 use crate::engine::input::Input;
 use crate::engine::render::imgui_render_pass::ImguiRenderPass;
 use crate::engine::render::object_render_pass::ObjectRenderPass;
@@ -10,7 +11,7 @@ use crate::window_state;
 use crate::world::GameData;
 
 pub struct WorldRenderer {
-    pub object_render_pass: ObjectRenderPass<GameData>,
+    pub chunk_render_pass: ChunkRenderPass,
     pub imgui_render_pass: ImguiRenderPass<GameData>,
 
     depth_texture: Texture,
@@ -21,7 +22,7 @@ impl WorldRenderer {
         let device = &window_state().device;
         let config = &window_state().config;
         Self {
-            object_render_pass: ObjectRenderPass::new(),
+            chunk_render_pass: ChunkRenderPass::new(),
             imgui_render_pass: ImguiRenderPass::new(),
             depth_texture: Texture::create_depth_texture(device, config, "depth_texture"),
         }
@@ -36,7 +37,7 @@ impl Renderer<GameData> for WorldRenderer {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let _ = self.object_render_pass.render(
+        let _ = self.chunk_render_pass.render(
             game_data,
             RenderPassViews {
                 color: Some(&view),

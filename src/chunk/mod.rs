@@ -3,11 +3,14 @@
 use std::collections::HashMap;
 
 pub mod block;
+pub mod chunk_renderer;
 pub mod collision;
 pub mod cube_model;
+pub mod culling;
 pub mod generation;
 pub mod loading;
 pub mod meshing;
+pub mod vec_set;
 use block::BlockDictionary;
 
 /// We load chunks by an area of
@@ -28,16 +31,7 @@ pub struct ChunkConfig {
     // initialized noise function
     // height bias
     // squish bias
-    pub noise: Lambda<
-        3,
-        libnoise::Blend<
-            3,
-            libnoise::Fbm<3, libnoise::Simplex<3>>,
-            Scale<3, libnoise::Worley<3>>,
-            Scale<3, libnoise::Worley<3>>,
-        >,
-        fn(f64) -> f64,
-    >, // fn([f64; 3]) -> f64, //Arc<dyn NoiseFn<f64, 3> + Send + Sync>, // fn([f64; 3]) -> f64, // chunk size?
+    pub noise: libnoise::Simplex<3>, // fn([f64; 3]) -> f64, //Arc<dyn NoiseFn<f64, 3> + Send + Sync>, // fn([f64; 3]) -> f64, // chunk size?
     pub noise_amplitude: (f64, f64, f64),
     pub depth: i32,
 

@@ -3,7 +3,7 @@ use super::{ChunkConfig, ChunkData, Position};
 // need to rework this function
 pub fn ground_threshold(_config: &ChunkConfig, pos: i32) -> f64 {
     let ground_level = 0;
-    let change = 64;
+    let change = 32;
     let _max_threshold = 0.5;
     let min_threshold = -0.05;
 
@@ -64,13 +64,23 @@ pub fn has_air_within_dist(config: &ChunkConfig, pos: [i32; 3], dist: i32) -> bo
 }
 
 pub fn get_terrain_at(config: &ChunkConfig, global_position: [i32; 3]) -> f64 {
-    let noise_position = [
+    let mut noise_position = [
         config.noise_amplitude.0 * global_position[0] as f64,
         config.noise_amplitude.1 * global_position[1] as f64,
         config.noise_amplitude.2 * global_position[2] as f64,
     ];
-    (&config.noise).sample(noise_position)
-    // + ground_threshold(config, global_position[1])
+
+    let mut noise = 0.0;
+    let mut amplitude = 0.5;
+    for _ in 0..4 {
+        noise += amplitude * (&config.noise).sample(noise_position);
+        noise_position[0] *= 2.0;
+        noise_position[1] *= 2.0;
+        noise_position[2] *= 2.0;
+        amplitude *= 0.5;
+    }
+
+    noise + ground_threshold(config, global_position[1])
     // + island_threshold(config, global_position)
 }
 

@@ -36,6 +36,7 @@ pub fn calculate_collider(
     let cz = chunk_pos.2 as f32 * config.depth as f32;
     let translation = vector![cx, cy, cz]; // Isometry3::translation(cx, cy, cz).to_matrix();
     ColliderBuilder::compound(collider_data)
-        .translation(translation).friction(0.0)
+        .translation(translation)
+        .friction(0.0)
         .build()
 }

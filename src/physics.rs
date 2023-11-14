@@ -22,7 +22,7 @@ pub struct PhysicsEngine {
     integration_parameters: IntegrationParameters,
     island_manager: IslandManager,
     broad_phase: BroadPhase,
-    narrow_phase: NarrowPhase,
+    pub narrow_phase: NarrowPhase,
     impulse_joint_set: ImpulseJointSet,
     multibody_joint_set: MultibodyJointSet,
     ccd_solver: CCDSolver,
@@ -132,6 +132,10 @@ impl PhysicsEngine {
             &(),
             &(),
         );
+    }
+
+    pub fn get_collider_handle(&self, id: &str) -> Option<&ColliderHandle> {
+        self.colliders_handles.get(id)
     }
 
     pub fn is_colliding(&self, id: &str) -> bool {
