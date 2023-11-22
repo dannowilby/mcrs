@@ -1,7 +1,7 @@
 use rapier3d::prelude::*;
 
 use crate::{
-    chunk::{chunk_id, chunk_position, get_block, ChunkConfig, ChunkStorage, Position},
+    chunk::{chunk_id, chunk_position, get_block, ChunkConfig, ChunkStorage, Position, player_to_position},
     engine::{
         input::Input,
         uniform::{Uniform, UniformData},
@@ -20,6 +20,7 @@ pub struct Player {
     pub max_jump: f32,
     sensitivity: f32,
     pub is_flying: bool,
+    last_chunk: Position,
 }
 
 impl Player {
@@ -32,6 +33,7 @@ impl Player {
             max_jump: 1.25,
             sensitivity: 0.2,
             is_flying: true,
+            last_chunk: (0,0,0)
         }
     }
 }
@@ -182,6 +184,28 @@ pub fn player_input(
     queue.push(Event::PlayerMoved);
 }
 
+pub fn player_changed_chunk(
+    _renderer: &mut WorldRenderer,
+    _input: &mut Input,
+    data: &mut GameData,
+    queue: &mut Vec<Event>,
+    _delta: f64,
+) {
+    let mut position = (0, 0, 0);
+    if let Some(player) = data.physics_engine.get_rigid_body("player".to_string()) {
+        let player_pos = player.translation();
+        position = player_to_position(&(player_pos.x, player_pos.y, player_pos.z));
+    }
+
+    // chunk loading dimensions
+    let current_player_chunk = chunk_position(&data.chunk_config, &position);
+    
+    if data.player.last_chunk != current_player_chunk {
+        queue.push(Event::PlayerChunkChanged);
+        data.player.last_chunk = current_player_chunk;
+    }
+}
+
 /// Update the player camera with look position and world position.
 pub fn update_camera(
     renderer: &mut WorldRenderer,
@@ -195,7 +219,7 @@ pub fn update_camera(
         ..
     }) = renderer.chunk_render_pass.uniforms.get_mut("view")
     {
-        let mat = m.matrix();
+        let mat = m.matrix_mut();
 
         // we use center of mass because then we clip less into walls
         let p_t = data
@@ -232,7 +256,7 @@ pub fn update_perspective(
     }) = renderer.chunk_render_pass.uniforms.get_mut("projection")
     {
         let config = &window_state().config;
-        let mat = m.matrix();
+        let mat = m.matrix_mut();
         *mat = glam::Mat4::perspective_rh_gl(
             data.player.fov,
             config.width as f32 / config.height as f32,

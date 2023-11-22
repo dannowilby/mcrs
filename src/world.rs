@@ -28,6 +28,7 @@ use crate::engine::texture;
 
 use crate::physics::PhysicsEngine;
 use crate::player::create_player;
+use crate::player::player_changed_chunk;
 use crate::player::simulate_player;
 use crate::player::{focus_window, player_input, update_camera, update_perspective, Player};
 use crate::window_state;
@@ -44,6 +45,7 @@ pub enum Event {
     Resized,
 
     PlayerMoved,
+    PlayerChunkChanged,
 }
 
 pub struct GameData {
@@ -68,6 +70,8 @@ pub struct GameData {
     pub player: Player,
     time: f64,
     frames: f64,
+    average_fps: f64,
+    total_frames: f64,
     pub drawn_chunks: u64,
     pub chunks_removed_by_visibility: u64,
     pub focused: bool,
@@ -96,8 +100,8 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
             chunk_config: Arc::new(ChunkConfig {
                 noise: Source::simplex(seed), // apply a closure to the noise Source::worley(123), //Arc.fbm(3, 0.013, 2.0, 0.5); // ::new(Worley::new(0)), // |[x, y, z]| f64::sin(x) + f64::sin(y) + f64::sin(z),
                 noise_amplitude: (0.01, 0.01, 0.01),
-                depth: 16,
-                load_radius: 8,
+                depth: 32,
+                load_radius: 3,
 
                 uv_size: 0.0625,
                 dict: BlockDictionary::from([
@@ -137,6 +141,8 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
             chunks_removed_by_visibility: 0,
             time: 0.0,
             frames: 0.0,
+            average_fps: 0.0,
+            total_frames: 0.0,
             focused: false,
         },
     );
@@ -184,7 +190,8 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
         .insert("view".to_string(), camera);
 
     // load player
-    create_player(&mut game_state.data, &(-15, 20, 0));
+    // create_player(&mut game_state.data, &(-15, 10, 0));
+    create_player(&mut game_state.data, &(0, 10, 0));
     update_camera(
         &mut game_state.renderer,
         &mut game_state.input,
@@ -201,9 +208,10 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
     game_state.add_system(Event::Tick, toggle_debug_menu);
     // game_state.add_system(Event::Tick, cursor_lock);
     game_state.add_system(Event::Tick, simulate_player);
-
     game_state.add_system(Event::PlayerMoved, update_camera);
-    game_state.add_system(Event::PlayerMoved, load_world);
+    game_state.add_system(Event::PlayerMoved, player_changed_chunk);
+    
+    game_state.add_system(Event::PlayerChunkChanged, load_world);
     game_state.add_system(Event::Tick, check_done_load_world);
     game_state.add_system(Event::Resized, update_perspective);
     // game_state.add_system(Event::Tick, mesh_chunks);
@@ -219,8 +227,13 @@ fn debug(
     _queue: &mut Vec<Event>,
     delta: f64,
 ) {
+    data.total_frames += 1.0;
     data.time = data.time + delta;
     data.frames = data.frames + 1.0;
+
+    let fps = 1000.0 * data.frames / data.time;
+    data.average_fps *= (data.total_frames - 1.0) / data.total_frames;
+    data.average_fps += fps / data.total_frames;
 
     if data.show_debug_menu {
         let d = delta.clone();
@@ -259,8 +272,8 @@ fn debug(
                     .position([0.0, 500.0], imgui::Condition::FirstUseEver)
                     .build(|| {
                         let fps = 1000.0 * game_data.frames / game_data.time;
-
                         ui.text(format!("FPS: {}", fps));
+                        ui.text(format!("Average FPS: {}", game_data.average_fps));
                         ui.text(format!("Frame delta: {}", d));
                         ui.text(format!(
                             "Chunks drawn this frame: {}",

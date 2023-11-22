@@ -1,17 +1,9 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
+use std::slice::Iter;
 
-use crate::{
-    engine::input::Input,
-    world::{Event, GameData},
-    world_renderer::WorldRenderer,
-};
+use super::{chunk_id, vec_set::VecSet, ChunkConfig, ChunkData, ChunkStorage, Position};
 
-use super::{
-    chunk_id, chunk_position, player_to_position, vec_set::VecSet, ChunkConfig, ChunkData,
-    ChunkStorage, Position,
-};
-
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
 pub enum Side {
     FRONT = 0,
     BACK = 1,
@@ -42,20 +34,33 @@ impl Side {
             Side::RIGHT => Side::LEFT,
         }
     }
+    pub fn iter() -> Iter<'static, Side> {
+        static SIDES: [Side; 6] = [
+            Side::FRONT,
+            Side::BACK,
+            Side::TOP,
+            Side::BOTTOM,
+            Side::LEFT,
+            Side::RIGHT,
+        ];
+
+        SIDES.iter()
+    }
 }
 
 /// A 6x6 matrix to keep track of which sides we can enter and exit from.
+#[derive(Debug)]
 pub struct VisibilityGraph([[bool; 6]; 6]);
 pub type VisibilityGraphStorage = HashMap<String, VisibilityGraph>;
 
 impl VisibilityGraph {
     pub const EMPTY_GRAPH: VisibilityGraph = VisibilityGraph([
-        [false, false, false, false, false, false],
-        [false, false, false, false, false, false],
-        [false, false, false, false, false, false],
-        [false, false, false, false, false, false],
-        [false, false, false, false, false, false],
-        [false, false, false, false, false, false],
+        [true, false, false, false, false, false],
+        [false, true, false, false, false, false],
+        [false, false, true, false, false, false],
+        [false, false, false, true, false, false],
+        [false, false, false, false, true, false],
+        [false, false, false, false, false, true],
     ]);
 
     // flood fill in this function
@@ -82,24 +87,34 @@ impl VisibilityGraph {
                     let block = chunk_data.get(&(x, y, z));
 
                     // start at an empty block
-                    if block.is_none() || config.dict.get(block.unwrap()).unwrap().transparent {
+                    if block.is_none()
+                        || config.dict.get(block.unwrap()).unwrap().transparent
+                            && !fill_seeds.contains(&(x, y, z))
+                    {
                         fill_seeds.insert((x, y, z));
                     }
                 }
             }
         }
 
+        let mut visited = VecSet::new();
         while !fill_seeds.is_empty() {
             let pos = fill_seeds.remove_front().unwrap();
             // flood fill to get sides we can exit out of
-            let sides = flood_fill(&config, &chunk_data, &pos, &mut fill_seeds);
+            let sides = flood_fill(&config, &chunk_data, &pos, &mut fill_seeds, &mut visited);
 
             // create tuples of sides that can reach each other from the result of flood fill
             // add the tuples to the connections vec
             for i in 0..(sides.len() - 1) {
                 for j in i..sides.len() {
-                    connections.push((sides[i], sides[j]));
-                    connections.push((sides[j], sides[i]));
+                    let connection1 = (sides[i], sides[j]);
+                    let connection2 = (sides[j], sides[i]);
+                    if !connections.contains(&connection1) {
+                        connections.push(connection1);
+                    }
+                    if !connections.contains(&connection2) {
+                        connections.push(connection2);
+                    }
                 }
             }
         }
@@ -134,10 +149,10 @@ fn flood_fill(
     chunk_data: &ChunkData,
     start_pos: &Position,
     fill_seeds: &mut VecSet<Position>,
+    visited: &mut VecSet<Position>,
 ) -> Vec<Side> {
     // might be more semantic to return a set as we want the values in the vec to be unique
     let mut output = Vec::new();
-    let mut visited = Vec::new();
     let mut stack = VecDeque::<Position>::from([start_pos.clone()]);
 
     while !stack.is_empty() {
@@ -151,29 +166,23 @@ fn flood_fill(
         if visited.contains(&pos) {
             continue;
         }
-        visited.push(pos.clone());
+        visited.insert(pos.clone());
 
         // skip if pos isn't in the dimensions of the chunk
         if pos.0 < 0
-            || pos.0 - 1 > config.depth
+            || pos.0 + 1 > config.depth
             || pos.1 < 0
-            || pos.1 - 1 > config.depth
+            || pos.1 + 1 > config.depth
             || pos.2 < 0
-            || pos.2 - 1 > config.depth
+            || pos.2 + 1 > config.depth
         {
             continue;
         }
-        
+
         // check if air
         // if not continue
         let block = chunk_data.get(&pos);
-        if block.is_some()
-            && !config
-                .dict
-                .get(block.unwrap())
-                .unwrap_or_default()
-                .transparent
-        {
+        if block.is_some() && !config.dict.get(block.unwrap()).unwrap().transparent {
             continue;
         }
 
@@ -181,24 +190,24 @@ fn flood_fill(
         // check if it is on the side
         // if on the side, add the side to the output if not already added
         // and add its neighbors to the queue
-        if pos.0 == 0 {
+        if pos.0 == 0 && !output.contains(&Side::RIGHT) {
             output.push(Side::RIGHT);
         }
-        if pos.0 == config.depth - 1 {
+        if pos.0 == config.depth - 1 && !output.contains(&Side::LEFT) {
             output.push(Side::LEFT);
         }
 
-        if pos.1 == 0 {
+        if pos.1 == 0 && !output.contains(&Side::BOTTOM) {
             output.push(Side::BOTTOM);
         }
-        if pos.1 == config.depth - 1 {
+        if pos.1 == config.depth - 1 && !output.contains(&Side::TOP) {
             output.push(Side::TOP);
         }
 
-        if pos.2 == 0 {
+        if pos.2 == 0 && !output.contains(&Side::FRONT) {
             output.push(Side::FRONT);
         }
-        if pos.2 == config.depth - 1 {
+        if pos.2 == config.depth - 1 && !output.contains(&Side::BACK) {
             output.push(Side::BACK);
         }
 
@@ -250,78 +259,92 @@ pub fn get_neighbors(loaded_chunks: &ChunkStorage, pos: &Position) -> Vec<(Side,
     output
 }
 
-/*
-/// implement the visibility graph here
-pub fn visibility_cull(
-    renderer: &mut WorldRenderer,
-    _input: &mut Input,
-    data: &mut GameData,
-    _queue: &mut Vec<Event>,
-    _delta: f64,
-) {
-    let player = data.physics_engine.get_rigid_body("player".to_string());
-    if player.is_none() {
-        return;
-    }
-    let pos = player.unwrap().translation();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let (yaw_sin, yaw_cos) = data.player.yaw.sin_cos();
-    let (pitch_sin, pitch_cos) = data.player.pitch.sin_cos();
-    let facing = glam::vec3(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
-
-    let chunk_pos = chunk_position(
-        &data.chunk_config,
-        &player_to_position(&(pos.x, pos.y, pos.z)),
-    );
-
-    // reset chunks to be rendered, set them all to invisible
-    for (_, v) in renderer.object_render_pass.render_objects.iter_mut() {
-        v.visible = false;
+    fn create_mock_config() -> ChunkConfig {
+        ChunkConfig::new(10, 8, 3)
     }
 
-    // set up a search queue, start with the chunk the player is in.
-    let mut search_queue = VecDeque::<(Option<Side>, Position)>::from([(None, chunk_pos)]);
+    #[test]
+    fn visibility_graph_full_chunk() {
+        let config = create_mock_config();
+        let mut full_chunk_data = ChunkData::new();
 
-    while !search_queue.is_empty() {
-        let (from_side, chunk_pos) = search_queue
-            .pop_front()
-            .expect("Queue was made unexpectedly empty");
-
-        // make this chunk visible
-        if let Some(chunk) = renderer
-            .object_render_pass
-            .render_objects
-            .get_mut(&chunk_id(&chunk_pos))
-        {
-            chunk.visible = true;
+        // fill the chunk with blocks
+        for x in 0..config.depth {
+            for y in 0..config.depth {
+                for z in 0..config.depth {
+                    // 2 is just some random transparent that we want to check
+                    full_chunk_data.insert((x, y, z), 2);
+                }
+            }
         }
 
-        get_neighbors(&data.loaded_chunks, &chunk_pos)
-            .into_iter()
-            .for_each(|(to_side, chunk_pos)| {
-                // correct direction filter:
-                // check if neighbor is in forward direction we are looking
-                // if the dot product is negative, then it should render
-                if to_side.normal().dot(facing) >= 0.0 {
-                    return;
-                }
+        let vis_graph = VisibilityGraph::from_chunk(&config, &full_chunk_data);
 
-                // visibility filter:
-                // check the chunk's visibility graph to see if we can reach it.
-                /*
-                let visibility_graph = VisibilityGraph::TEST_GRAPH;
-                if let Some(side) = from_side {
-                    if !visibility_graph.can_reach_from(side, to_side) {
-                        return;
+        // iter over each entry to check if any are false
+        for side1 in Side::iter() {
+            for side2 in Side::iter() {
+                if side1 == side2 {
+                    assert!(vis_graph.can_reach_from(*side1, *side2));
+                    continue;
+                }
+                assert!(!vis_graph.can_reach_from(*side1, *side2));
+            }
+        }
+    }
+
+    #[test]
+    fn visibility_graph_empty_chunk() {
+        let config = create_mock_config();
+        let empty_chunk_data = ChunkData::new();
+        let vis_graph = VisibilityGraph::from_chunk(&config, &empty_chunk_data);
+
+        // iter over each entry to check if any are false
+        for side1 in Side::iter() {
+            for side2 in Side::iter() {
+                assert!(vis_graph.can_reach_from(*side1, *side2));
+            }
+        }
+    }
+
+    #[test]
+    fn visibility_graph_split_chunk() {
+        let config = create_mock_config();
+        let mut split_chunk_data = ChunkData::new();
+
+        // fill the chunk with blocks
+        for x in 0..config.depth {
+            for y in 0..config.depth {
+                for z in 0..config.depth {
+                    // 2 is just some random transparent that we want to check
+                    if x == 3 {
+                        split_chunk_data.insert((x, y, z), 2);
                     }
                 }
-                */
+            }
+        }
 
-                // might want to add an actual frustum cull step here.
+        let vis_graph = VisibilityGraph::from_chunk(&config, &split_chunk_data);
 
-                // if chunk has passed the filters, then add it
-                search_queue.push_back((Some(to_side.opposite()), chunk_pos.clone()));
-            });
+        for side1 in Side::iter() {
+            for side2 in Side::iter() {
+                if (*side1 == Side::RIGHT && *side2 == Side::LEFT)
+                    || (*side2 == Side::RIGHT && *side1 == Side::LEFT)
+                {
+                    assert!(!vis_graph.can_reach_from(*side1, *side2));
+                    continue;
+                }
+
+                assert!(
+                    vis_graph.can_reach_from(*side1, *side2),
+                    "{:?} - {:?}",
+                    side1,
+                    side2
+                );
+            }
+        }
     }
 }
-*/

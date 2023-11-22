@@ -1,9 +1,9 @@
 // Vertex shader
 
 struct VertexInput {
-    @location(0) position: vec3<f32>,
-    @location(1) tex_coords: vec2<f32>,
-    @location(2) ao: f32,
+    @location(0) position: u32,
+    // @location(1) tex_coords: u32,
+    // @location(2) ao: u32,
 }
 
 struct VertexOutput {
@@ -21,14 +21,35 @@ var<uniform> view: mat4x4<f32>;
 @group(2) @binding(0)
 var<uniform> model: mat4x4<f32>;
 
+fn unpack_vertex(in_vertex: u32) -> VertexOutput {
+    
+    var output: VertexOutput;
+    
+    output.clip_position = vec4<f32>(
+        f32((in_vertex & 0xfe000000u) >> u32(25)),
+        f32((in_vertex & 0x01FC0000u) >> u32(18)),
+        f32((in_vertex & 0x0003F800u) >> u32(11)),
+        1.0
+    );
+    
+    output.tex_coords = vec2<f32>(
+        f32((in_vertex & 0x00000780u) >> u32(7)) / 16.0,
+        f32((in_vertex & 0x00000078u) >> u32(3)) / 16.0
+    );
+    
+    output.ao = f32((in_vertex & 0x00000007u) >> u32(0)) / 2.0;
+    
+    return output;
+}
+
 @vertex
 fn vs_main(
     input: VertexInput,
 ) -> VertexOutput {
-    var out: VertexOutput;
-    out.tex_coords = input.tex_coords;
-    out.ao = input.ao;
-    out.clip_position = projection * view * model * vec4<f32>(input.position, 1.0);
+    var out: VertexOutput = unpack_vertex(input.position);
+    
+    out.clip_position = projection * view * model * out.clip_position;
+    
     return out;
 }
 

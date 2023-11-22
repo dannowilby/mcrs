@@ -38,6 +38,9 @@ where
         }
         self.set.remove(elem);
     }
+    pub fn contains(&self, elem: &T) -> bool {
+        self.set.contains(elem)
+    }
     pub fn is_empty(&self) -> bool {
         assert_eq!(self.set.len(), self.vec.len());
         self.vec.is_empty()

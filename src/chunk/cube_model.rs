@@ -117,50 +117,50 @@ fn top_face(
         last_index + 3,
     ]);
     vertices.extend_from_slice(&[
-        Vertex {
-            position: [x, y + 1.0, z + 1.0],
-            uv: [u, v],
-            ao: ao(
+        Vertex::from(
+            [x, y + 1.0, z + 1.0],
+            [u, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i - 1, *j, *k),
                 &(*i, *j, *k + 1),
                 &(*i - 1, *j, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y + 1.0, z + 1.0],
-            uv: [u + duv, v],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y + 1.0, z + 1.0],
+            [u + duv, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i + 1, *j, *k),
                 &(*i, *j, *k + 1),
                 &(*i + 1, *j, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x, y + 1.0, z],
-            uv: [u, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x, y + 1.0, z],
+            [u, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i, *j, *k - 1),
                 &(*i - 1, *j, *k),
                 &(*i - 1, *j, *k - 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y + 1.0, z],
-            uv: [u + duv, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y + 1.0, z],
+            [u + duv, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i + 1, *j, *k),
                 &(*i, *j, *k - 1),
                 &(*i + 1, *j, *k - 1),
             ),
-        },
+        ),
     ]);
 }
 
@@ -190,50 +190,50 @@ fn bottom_face(
         last_index + 1,
     ]);
     vertices.extend_from_slice(&[
-        Vertex {
-            position: [x, y, z + 1.0],
-            uv: [u, v],
-            ao: ao(
+        Vertex::from(
+            [x, y, z + 1.0],
+            [u, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i - 1, *j - 2, *k),
                 &(*i, *j - 2, *k + 1),
                 &(*i - 1, *j - 2, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y, z + 1.0],
-            uv: [u + duv, v],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y, z + 1.0],
+            [u + duv, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i + 1, *j - 2, *k),
                 &(*i, *j - 2, *k + 1),
                 &(*i + 1, *j - 2, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x, y, z],
-            uv: [u, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x, y, z],
+            [u, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i - 1, *j - 2, *k),
                 &(*i, *j - 2, *k - 1),
                 &(*i - 1, *j - 2, *k - 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y, z],
-            uv: [u + duv, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y, z],
+            [u + duv, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i + 1, *j - 2, *k),
                 &(*i, *j - 2, *k - 1),
                 &(*i + 1, *j - 2, *k - 1),
             ),
-        },
+        ),
     ]);
 }
 
@@ -263,50 +263,50 @@ fn front_face(
         last_index + 3,
     ]);
     vertices.extend_from_slice(&[
-        Vertex {
-            position: [x, y, z + 1.0],
-            uv: [u, v],
-            ao: ao(
+        Vertex::from(
+            [x, y, z + 1.0],
+            [u, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i - 1, *j - 1, *k + 1),
                 &(*i, *j - 2, *k + 1),
                 &(*i - 1, *j - 2, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y, z + 1.0],
-            uv: [u + duv, v],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y, z + 1.0],
+            [u + duv, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i + 1, *j - 1, *k + 1),
                 &(*i, *j - 2, *k + 1),
                 &(*i + 1, *j - 2, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x, y + 1.0, z + 1.0],
-            uv: [u, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x, y + 1.0, z + 1.0],
+            [u, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i, *j, *k + 1),
                 &(*i - 1, *j - 1, *k + 1),
                 &(*i - 1, *j, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y + 1.0, z + 1.0],
-            uv: [u + duv, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y + 1.0, z + 1.0],
+            [u + duv, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i, *j, *k + 1),
                 &(*i + 1, *j - 1, *k + 1),
                 &(*i + 1, *j, *k + 1),
             ),
-        },
+        ),
     ]);
 }
 
@@ -336,50 +336,50 @@ fn back_face(
         last_index + 1,
     ]);
     vertices.extend_from_slice(&[
-        Vertex {
-            position: [x, y, z],
-            uv: [u, v],
-            ao: ao(
+        Vertex::from(
+            [x, y, z],
+            [u, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i - 1, *j - 1, *k - 1),
                 &(*i, *j - 2, *k - 1),
                 &(*i - 1, *j - 2, *k - 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y, z],
-            uv: [u + duv, v],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y, z],
+            [u + duv, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i + 1, *j - 1, *k - 1),
                 &(*i, *j - 2, *k - 1),
                 &(*i + 1, *j - 2, *k - 1),
             ),
-        },
-        Vertex {
-            position: [x, y + 1.0, z],
-            uv: [u, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x, y + 1.0, z],
+            [u, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i, *j, *k - 1),
                 &(*i - 1, *j - 1, *k - 1),
                 &(*i - 1, *j, *k - 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y + 1.0, z],
-            uv: [u + duv, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y + 1.0, z],
+            [u + duv, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i, *j, *k - 1),
                 &(*i + 1, *j - 1, *k - 1),
                 &(*i + 1, *j, *k - 1),
             ),
-        },
+        ),
     ]);
 }
 
@@ -409,50 +409,50 @@ fn right_face(
         last_index + 3,
     ]);
     vertices.extend_from_slice(&[
-        Vertex {
-            position: [x + 1.0, y, z + 1.0],
-            uv: [u, v],
-            ao: ao(
+        Vertex::from(
+            [x + 1.0, y, z + 1.0],
+            [u, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i + 1, *j - 1, *k + 1),
                 &(*i + 1, *j - 2, *k),
                 &(*i + 1, *j - 2, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y + 1.0, z + 1.0],
-            uv: [u + duv, v],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y + 1.0, z + 1.0],
+            [u + duv, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i + 1, *j, *k + 1),
                 &(*i + 1, *j, *k),
                 &(*i + 1, *j - 1, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y, z],
-            uv: [u, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y, z],
+            [u, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i + 1, *j - 1, *k - 1),
                 &(*i + 1, *j - 2, *k),
                 &(*i + 1, *j - 2, *k - 1),
             ),
-        },
-        Vertex {
-            position: [x + 1.0, y + 1.0, z],
-            uv: [u + duv, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x + 1.0, y + 1.0, z],
+            [u + duv, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i + 1, *j, *k - 1),
                 &(*i + 1, *j, *k),
                 &(*i + 1, *j - 1, *k - 1),
             ),
-        },
+        ),
     ]);
 }
 fn left_face(
@@ -481,49 +481,49 @@ fn left_face(
         last_index + 2,
     ]);
     vertices.extend_from_slice(&[
-        Vertex {
-            position: [x, y, z + 1.0],
-            uv: [u, v],
-            ao: ao(
+        Vertex::from(
+            [x, y, z + 1.0],
+            [u, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i - 1, *j - 1, *k + 1),
                 &(*i - 1, *j - 2, *k),
                 &(*i - 1, *j - 2, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x, y + 1.0, z + 1.0],
-            uv: [u + duv, v],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x, y + 1.0, z + 1.0],
+            [u + duv, v],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i - 1, *j, *k + 1),
                 &(*i - 1, *j, *k),
                 &(*i - 1, *j - 1, *k + 1),
             ),
-        },
-        Vertex {
-            position: [x, y, z],
-            uv: [u, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x, y, z],
+            [u, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i - 1, *j - 1, *k - 1),
                 &(*i - 1, *j - 2, *k),
                 &(*i - 1, *j - 2, *k - 1),
             ),
-        },
-        Vertex {
-            position: [x, y + 1.0, z],
-            uv: [u + duv, v + duv],
-            ao: ao(
+        ),
+        Vertex::from(
+            [x, y + 1.0, z],
+            [u + duv, v + duv],
+            ao(
                 chunk,
                 chunk_config,
                 &(*i - 1, *j, *k - 1),
                 &(*i - 1, *j, *k),
                 &(*i - 1, *j - 1, *k - 1),
             ),
-        },
+        ),
     ]);
 }

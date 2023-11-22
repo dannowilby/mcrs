@@ -16,20 +16,21 @@ This is a minecraft-clone written in rust. It is made with WGPU and is playable 
 - ~~Make better player jump/movement physics~~
 - ~~Add ImGui to configure variables~~
 - ~~Make player physics actually work better~~
-- Add visibility graph for chunk culling
-- Add lighting (+ dithering between light levels)
-- Compress data to send to GPU for each chunk.
+- ~~Add visibility graph for chunk culling~~
+- ~~Compress data to send to GPU for each chunk.~~
+
+- ~~Calculate frustrum corners and cull based on that.~~
+- ~~Fix visibility culling (If we've already seen a chunk, we might want to check if we can get through from another side than the one already considered).~~
+- ~~Load chunks around player first.~~
+- Add lighting (+ dithering between light levels).
+- Add fog.
 
 - Add loading screen
 - Make sure build works on WASM target
 - Be able to add/remove blocks
 
-- Load chunks around player first
-- Sort rendering code more
 - Load game data from JSON (or other file format) for example block models, etc...
-- Run flamegraph and see why minimal FPS
-- Add structure generation
-    - Create a chunk loader for separate stages of generation
-- Frustum culling
-- Create visibility graph
-- Cut down on memory usage - pack bits
+
+Minecraft tends to render 100-200 chunks per frame. On my computer, at 6 render distance, it gets a variable 60fps. This should be achievable here.
+// calculate frustum bounds and use to cull.
+// change rendering code so we are not rebinding the pipeline for every single chunk.

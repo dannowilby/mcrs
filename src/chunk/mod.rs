@@ -27,6 +27,8 @@ pub type ChunkStorage = HashMap<String, ChunkData>;
 
 use libnoise::prelude::*;
 
+use self::{block::Block, cube_model::cube_model};
+
 pub struct ChunkConfig {
     // initialized noise function
     // height bias
@@ -39,6 +41,48 @@ pub struct ChunkConfig {
     pub load_radius: u32,
 
     pub dict: BlockDictionary,
+}
+
+impl ChunkConfig {
+    fn new(seed: u32, depth: i32, load_radius: u32) -> Self {
+        Self {
+            noise: Simplex::new(seed as u64),
+            depth,
+            load_radius,
+            uv_size: 0.0625,
+            noise_amplitude: (0.001, 0.01, 0.001),
+            dict: BlockDictionary::from([
+                (0, Block::default()),
+                (
+                    1,
+                    Block {
+                        model: cube_model,
+                        transparent: false,
+                        ident: "grass".to_owned(),
+                        uv: [0.0, 0.0],
+                    },
+                ),
+                (
+                    2,
+                    Block {
+                        model: cube_model,
+                        transparent: false,
+                        ident: "stone".to_owned(),
+                        uv: [0.0625, 0.0],
+                    },
+                ),
+                (
+                    3,
+                    Block {
+                        model: cube_model,
+                        transparent: false,
+                        ident: "dirt".to_owned(),
+                        uv: [0.125, 0.0],
+                    },
+                ),
+            ]),
+        }
+    }
 }
 
 /// convert player float tuple to i32 tuple

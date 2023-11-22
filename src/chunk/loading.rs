@@ -36,9 +36,9 @@ pub fn load_world(
 
     let mut chunks_to_load = Vec::new();
     // calculate chunks to modify
-    for x in (i - radius)..(i + radius) {
-        for y in (j - 2)..(j + 2) {
-            for z in (k - radius)..(k + radius) {
+    for x in (i - radius)..(i + radius + 1) {
+        for y in (j - radius)..(j + radius + 1) {
+            for z in (k - radius)..(k + radius + 1) {
                 let chunk_id = chunk_id(&(x, y, z));
 
                 let index = chunks_to_remove.iter().position(|r| r == &chunk_id);

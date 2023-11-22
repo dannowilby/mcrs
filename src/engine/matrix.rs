@@ -30,8 +30,13 @@ impl Matrix {
         }
     }
 
+    /// Get a reference to the underlying matrix.
+    pub fn matrix(&self) -> &Mat4 {
+        &self.data
+    }
+
     /// Get a mutable reference to the underlying matrix. Doesn't automatically update the buffer.
-    pub fn matrix(&mut self) -> &mut Mat4 {
+    pub fn matrix_mut(&mut self) -> &mut Mat4 {
         &mut self.data
     }
 
