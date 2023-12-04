@@ -2,8 +2,8 @@ use winit::event::{Event, VirtualKeyCode};
 
 use crate::chunk::chunk_renderer::ChunkRenderPass;
 use crate::engine::input::Input;
+use crate::engine::render::frame_render_pass::FrameRenderPass;
 use crate::engine::render::imgui_render_pass::ImguiRenderPass;
-use crate::engine::render::object_render_pass::ObjectRenderPass;
 use crate::engine::render::render_pass::{RenderPass, RenderPassViews};
 use crate::engine::render::renderer::Renderer;
 use crate::engine::texture::Texture;
@@ -13,18 +13,30 @@ use crate::world::GameData;
 pub struct WorldRenderer {
     pub chunk_render_pass: ChunkRenderPass,
     pub imgui_render_pass: ImguiRenderPass<GameData>,
+    pub frame_render_pass: FrameRenderPass,
+
+    downscale_factor: u32,
 
     depth_texture: Texture,
 }
 
 impl WorldRenderer {
-    pub fn new() -> Self {
+    pub fn new(frame_source: &str) -> Self {
         let device = &window_state().device;
         let config = &window_state().config;
+        let downscale_factor = 4;
         Self {
             chunk_render_pass: ChunkRenderPass::new(),
             imgui_render_pass: ImguiRenderPass::new(),
-            depth_texture: Texture::create_depth_texture(device, config, "depth_texture"),
+            frame_render_pass: FrameRenderPass::new(downscale_factor, frame_source),
+            downscale_factor,
+            depth_texture: Texture::create_depth_texture(
+                device,
+                config,
+                "depth_texture",
+                config.width / downscale_factor,
+                config.height / downscale_factor,
+            ),
         }
     }
 }
@@ -37,11 +49,22 @@ impl Renderer<GameData> for WorldRenderer {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
+        let downscaled_view = self.frame_render_pass.get_render_texture_view().unwrap();
+
         let _ = self.chunk_render_pass.render(
             game_data,
             RenderPassViews {
-                color: Some(&view),
+                color: Some(&downscaled_view),
                 depth: Some(&self.depth_texture.view),
+            },
+            delta,
+        )?;
+
+        let _ = self.frame_render_pass.render(
+            game_data,
+            RenderPassViews {
+                color: Some(&view),
+                depth: None,
             },
             delta,
         )?;
@@ -69,7 +92,14 @@ impl Renderer<GameData> for WorldRenderer {
     fn resize(&mut self) {
         let device = &window_state().device;
         let config = &window_state().config;
-        self.depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
+        self.frame_render_pass.resize(self.downscale_factor);
+        self.depth_texture = Texture::create_depth_texture(
+            &device,
+            &config,
+            "depth_texture",
+            config.width / self.downscale_factor,
+            config.height / self.downscale_factor,
+        );
     }
 
     fn handle_event(&mut self, event: &Event<()>) {

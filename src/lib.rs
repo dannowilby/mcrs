@@ -5,6 +5,7 @@ mod chunk;
 mod engine;
 mod physics;
 mod player;
+mod util;
 mod window;
 mod world;
 mod world_renderer;

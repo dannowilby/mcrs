@@ -1,5 +1,7 @@
 //! Module for all things involving chunks
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 
 pub mod block;
@@ -10,7 +12,6 @@ pub mod culling;
 pub mod generation;
 pub mod loading;
 pub mod meshing;
-pub mod vec_set;
 use block::BlockDictionary;
 
 /// We load chunks by an area of
@@ -44,6 +45,7 @@ pub struct ChunkConfig {
 }
 
 impl ChunkConfig {
+    #[allow(dead_code)]
     fn new(seed: u32, depth: i32, load_radius: u32) -> Self {
         Self {
             noise: Simplex::new(seed as u64),
@@ -127,7 +129,32 @@ pub fn global_chunk_pos(chunk_config: &ChunkConfig, pos: i32) -> i32 {
 
 /// take a position and return a chunk_id
 pub fn chunk_id(pos: &Position) -> String {
-    format!("chunk-{}-{}-{}", pos.0, pos.1, pos.2)
+    format!("chunk,{},{},{}", pos.0, pos.1, pos.2)
+}
+
+pub fn chunk_pos_from_id(chunk_id: &String) -> Position {
+    let mut pos = (0, 0, 0);
+
+    let mut c = 0;
+    for part in chunk_id.split(",") {
+        if c == 0 {
+            c += 1;
+            continue;
+        }
+
+        if c == 1 {
+            pos.0 = part.parse().unwrap();
+        }
+        if c == 2 {
+            pos.1 = part.parse().unwrap();
+        }
+        if c == 3 {
+            pos.2 = part.parse().unwrap();
+        }
+        c += 1;
+    }
+
+    pos
 }
 
 #[allow(dead_code)]

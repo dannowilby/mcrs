@@ -15,13 +15,6 @@ pub fn ground_threshold(_config: &ChunkConfig, pos: i32) -> f64 {
     bias.max(min_threshold)
 }
 
-pub fn island_threshold(config: &ChunkConfig, pos: [i32; 3]) -> f64 {
-    let [x, _y, z] = pos;
-    let t = config.depth as f64 * f64::exp(-(x as f64).abs()) - 1.0;
-    let r = config.depth as f64 * f64::exp(-(z as f64).abs()) - 1.0;
-    t.min(r)
-}
-
 // could abstract out the generating functions
 // would just overcomplicate things at the moment
 pub fn generate(config: &ChunkConfig, pos: &Position) -> ChunkData {

@@ -10,6 +10,7 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
     @location(1) ao: f32,
+    @location(2) distance: f32,
 }
 
 @group(0) @binding(0)
@@ -39,6 +40,8 @@ fn unpack_vertex(in_vertex: u32) -> VertexOutput {
     
     output.ao = f32((in_vertex & 0x00000007u) >> u32(0)) / 2.0;
     
+    output.distance = 1.0;
+    
     return output;
 }
 
@@ -49,6 +52,7 @@ fn vs_main(
     var out: VertexOutput = unpack_vertex(input.position);
     
     out.clip_position = projection * view * model * out.clip_position;
+    out.distance = length(out.clip_position);
     
     return out;
 }
@@ -62,5 +66,13 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    // we manually set the fog color and fog start/end at this point, might be better to pass in as 
+    var distance = in.distance;
+    if distance < 96.0 {
+        distance = 0.0;
+    } else {
+        distance = distance - 96.0;
+    }
+//     return mix(in.ao * textureSample(t_diffuse, s_diffuse, in.tex_coords), vec4<f32>(0.1, 0.2, 0.3, 1.0), min(distance / 32.0, 1.0));
     return in.ao * textureSample(t_diffuse, s_diffuse, in.tex_coords);
 }

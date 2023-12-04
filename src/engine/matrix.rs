@@ -5,7 +5,7 @@ use wgpu::Buffer;
 
 use crate::window_state;
 
-use super::uniform::{Uniform, UniformLayout};
+use super::render::uniform::{Uniform, UniformLayout};
 
 /// Stores the matrix and the buffer it is stored in for WGPU.
 #[derive(Debug)]
@@ -90,7 +90,7 @@ impl Matrix {
         Uniform {
             location: layout.location,
             bind_group,
-            data: super::uniform::UniformData::Matrix(self),
+            data: super::render::uniform::UniformData::Matrix(self),
         }
     }
 }

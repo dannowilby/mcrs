@@ -1,6 +1,6 @@
 use wgpu::VertexBufferLayout;
 
-use super::super::engine::render_object::RenderObject;
+use super::super::engine::render::render_object::RenderObject;
 use super::{ChunkConfig, ChunkData, Position, LOD};
 
 /// 7 bits for each position, 4 bits for each texture, and 3 bits for lighting

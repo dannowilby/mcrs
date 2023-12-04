@@ -5,8 +5,8 @@ use image::GenericImageView;
 
 use crate::{
     engine::{
+        render::uniform::{Uniform, UniformData, UniformLayout},
         resources::load_binary,
-        uniform::{Uniform, UniformData, UniformLayout},
     },
     window_state,
 };
@@ -86,6 +86,51 @@ impl Texture {
         })
     }
 
+    pub fn create_render_texture(width: u32, height: u32) -> Self {
+            let device = &window_state().device;
+            let label = "Downscaled";
+        
+            let size = wgpu::Extent3d {
+                // 2.
+                width,
+                height,
+                depth_or_array_layers: 1,
+            };
+            let desc = wgpu::TextureDescriptor {
+                label: Some(label),
+                size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT // 3.
+                        | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            };
+            let texture = device.create_texture(&desc);
+        
+            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+                // 4.
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Nearest,
+                min_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::FilterMode::Nearest,
+                compare: None, // 5.
+                lod_min_clamp: 0.0,
+                lod_max_clamp: 100.0,
+                ..Default::default()
+            });
+                Self {
+                    texture,
+                    view,
+                    sampler,
+                }
+         
+    }
+
     /// Depth texture format.
     pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float; // 1.
 
@@ -93,11 +138,13 @@ impl Texture {
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
         label: &str,
+        width: u32,
+        height: u32,
     ) -> Self {
         let size = wgpu::Extent3d {
             // 2.
-            width: config.width,
-            height: config.height,
+            width,
+            height,
             depth_or_array_layers: 1,
         };
         let desc = wgpu::TextureDescriptor {

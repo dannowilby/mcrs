@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use wgpu::Buffer;
 
-use crate::engine::uniform::Uniform;
+use crate::engine::render::uniform::Uniform;
 use crate::window_state;
 
 /// Stores the id of its associated [render group](super::render_group::RenderGroup), a vertex and index buffer,

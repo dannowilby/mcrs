@@ -22,8 +22,9 @@ This is a minecraft-clone written in rust. It is made with WGPU and is playable 
 - ~~Calculate frustrum corners and cull based on that.~~
 - ~~Fix visibility culling (If we've already seen a chunk, we might want to check if we can get through from another side than the one already considered).~~
 - ~~Load chunks around player first.~~
+- ~~Add fog.~~
+- Debug renderer.
 - Add lighting (+ dithering between light levels).
-- Add fog.
 
 - Add loading screen
 - Make sure build works on WASM target

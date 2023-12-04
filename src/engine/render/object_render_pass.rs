@@ -1,7 +1,9 @@
+#![allow(dead_code)]
+
 use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
-    engine::{render_group::RenderGroup, render_object::RenderObject, uniform::Uniform},
+    engine::render::{render_group::RenderGroup, render_object::RenderObject, uniform::Uniform},
     window_state,
 };
 

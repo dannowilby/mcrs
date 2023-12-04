@@ -1,19 +1,14 @@
 use priomutex::Mutex;
-use std::collections::HashMap;
 use std::collections::HashSet;
-use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::chunk::block::{Block, BlockDictionary};
-use crate::chunk::chunk_id;
-use crate::chunk::chunk_position;
 use crate::chunk::cube_model::cube_model;
 use crate::chunk::culling::VisibilityGraph;
 use crate::chunk::culling::VisibilityGraphStorage;
 use crate::chunk::loading::check_done_load_world;
 use crate::chunk::loading::load_world;
 use crate::chunk::meshing;
-use crate::chunk::player_to_position;
 use crate::chunk::ChunkConfig;
 use crate::chunk::ChunkData;
 use crate::chunk::ChunkStorage;
@@ -21,8 +16,8 @@ use crate::chunk::Position;
 use crate::engine::game_state::GameState;
 use crate::engine::input::Input;
 use crate::engine::matrix::Matrix;
-use crate::engine::render_group::RenderGroupBuilder;
-use crate::engine::render_object::RenderObject;
+use crate::engine::render::render_group::RenderGroupBuilder;
+use crate::engine::render::render_object::RenderObject;
 use crate::engine::resources::load_string;
 use crate::engine::texture;
 
@@ -57,8 +52,14 @@ pub struct GameData {
     pub visibility_graphs: VisibilityGraphStorage,
 
     pub loading: HashSet<String>,
-    pub done_loading:
-        Arc<Mutex<HashMap<String, (Position, ChunkData, VisibilityGraph, RenderObject, Collider)>>>,
+    pub done_loading: Arc<
+        Mutex<
+            indexmap::IndexMap<
+                String,
+                (Position, ChunkData, VisibilityGraph, RenderObject, Collider),
+            >,
+        >,
+    >,
 
     // physics
     pub physics_engine: PhysicsEngine,
@@ -74,6 +75,7 @@ pub struct GameData {
     total_frames: f64,
     pub drawn_chunks: u64,
     pub chunks_removed_by_visibility: u64,
+    pub amount_of_culled_blocks: u64,
     pub focused: bool,
 }
 
@@ -81,8 +83,9 @@ use libnoise::prelude::*;
 
 pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
     let seed = 123456789;
+    let frame_shader_source = load_string("frame.wgsl", true).await.unwrap();
     let mut game_state = GameState::new(
-        WorldRenderer::new(),
+        WorldRenderer::new(&frame_shader_source),
         GameData {
             show_debug_menu: false,
 
@@ -91,17 +94,20 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
             visibility_graphs: VisibilityGraphStorage::new(),
 
             loading: HashSet::new(),
-            done_loading: Arc::new(Mutex::new(HashMap::new())),
+            done_loading: Arc::new(Mutex::new(indexmap::IndexMap::new())),
 
             physics_engine: PhysicsEngine::new(),
 
-            thread_pool: rayon::ThreadPoolBuilder::new().build().unwrap(),
+            thread_pool: rayon::ThreadPoolBuilder::new()
+                // .num_threads(2)
+                .build()
+                .unwrap(),
 
             chunk_config: Arc::new(ChunkConfig {
                 noise: Source::simplex(seed), // apply a closure to the noise Source::worley(123), //Arc.fbm(3, 0.013, 2.0, 0.5); // ::new(Worley::new(0)), // |[x, y, z]| f64::sin(x) + f64::sin(y) + f64::sin(z),
-                noise_amplitude: (0.01, 0.01, 0.01),
+                noise_amplitude: (0.005, 0.005, 0.005),
                 depth: 32,
-                load_radius: 3,
+                load_radius: 4,
 
                 uv_size: 0.0625,
                 dict: BlockDictionary::from([
@@ -139,6 +145,7 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
             player: Player::new(),
             drawn_chunks: 0,
             chunks_removed_by_visibility: 0,
+            amount_of_culled_blocks: 0,
             time: 0.0,
             frames: 0.0,
             average_fps: 0.0,
@@ -159,10 +166,10 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
             .with("texture_atlas", texture::Texture::create_layout(3))
             .vertex_format(meshing::Vertex::description())
             .shader(&shader_source)
-            .build(),
+            .build(true),
     );
 
-    let texture_uniform = texture::Texture::load("texture_atlas.png").await;
+    let texture_uniform = texture::Texture::load("texture_atlas_low_res.png").await;
     game_state.renderer.chunk_render_pass.uniforms.insert(
         "texture_atlas".to_string(),
         texture_uniform.uniform(&texture::Texture::create_layout(3)),
@@ -210,7 +217,7 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
     game_state.add_system(Event::Tick, simulate_player);
     game_state.add_system(Event::PlayerMoved, update_camera);
     game_state.add_system(Event::PlayerMoved, player_changed_chunk);
-    
+
     game_state.add_system(Event::PlayerChunkChanged, load_world);
     game_state.add_system(Event::Tick, check_done_load_world);
     game_state.add_system(Event::Resized, update_perspective);

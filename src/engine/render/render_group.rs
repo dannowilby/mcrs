@@ -1,6 +1,6 @@
 //! RenderGroups are used to hold specific render pipelines and their associated uniforms.
 
-use crate::engine::uniform::UniformLayout;
+use crate::engine::render::uniform::UniformLayout;
 
 use crate::window_state;
 
@@ -57,7 +57,7 @@ impl<'a> RenderGroupBuilder<'a> {
     }
 
     /// Consume the builder and return a built render group. Will panic if no vertex format or shader set.
-    pub fn build(self) -> RenderGroup {
+    pub fn build(self, depth: bool) -> RenderGroup {
         let layouts: Vec<&BindGroupLayout> = self.uniforms.iter().map(|x| &x.layout).collect();
 
         let shader = self.shader.expect("No shader set for RenderGroup.");
@@ -65,6 +65,17 @@ impl<'a> RenderGroupBuilder<'a> {
         let vertex_format = self
             .vertex_format
             .expect("No vertex format specified for RenderGroup.");
+
+        let mut depth_stencil = None;
+        if depth {
+            depth_stencil = Some(wgpu::DepthStencilState {
+                format: TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less, // 1.
+                stencil: wgpu::StencilState::default(),     // 2.
+                bias: wgpu::DepthBiasState::default(),
+            });
+        }
 
         let render_pipeline_layout =
             window_state()
@@ -108,13 +119,7 @@ impl<'a> RenderGroupBuilder<'a> {
                     // Requires Features::CONSERVATIVE_RASTERIZATION
                     conservative: false,
                 },
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: TextureFormat::Depth32Float,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less, // 1.
-                    stencil: wgpu::StencilState::default(),     // 2.
-                    bias: wgpu::DepthBiasState::default(),
-                }),
+                depth_stencil,
                 multisample: wgpu::MultisampleState {
                     count: 1,                         // 2.
                     mask: !0,                         // 3.

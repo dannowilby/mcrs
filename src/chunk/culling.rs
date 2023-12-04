@@ -1,7 +1,9 @@
 use std::collections::{HashMap, VecDeque};
 use std::slice::Iter;
 
-use super::{chunk_id, vec_set::VecSet, ChunkConfig, ChunkData, ChunkStorage, Position};
+use super::{
+    super::util::vec_set::VecSet, chunk_id, ChunkConfig, ChunkData, ChunkStorage, Position,
+};
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
 pub enum Side {
@@ -14,14 +16,15 @@ pub enum Side {
 }
 
 impl Side {
+    #[allow(dead_code)]
     pub fn normal(&self) -> glam::Vec3 {
         match self {
             Side::FRONT => glam::vec3(0.0, 0.0, 1.0),
             Side::BACK => glam::vec3(0.0, 0.0, -1.0),
-            Side::TOP => glam::vec3(0.0, -1.0, 0.0),
-            Side::BOTTOM => glam::vec3(0.0, 1.0, 0.0),
-            Side::LEFT => glam::vec3(1.0, 0.0, 0.0),
-            Side::RIGHT => glam::vec3(-1.0, 0.0, 0.0),
+            Side::TOP => glam::vec3(0.0, 1.0, 0.0),
+            Side::BOTTOM => glam::vec3(0.0, -1.0, 0.0),
+            Side::LEFT => glam::vec3(-1.0, 0.0, 0.0),
+            Side::RIGHT => glam::vec3(1.0, 0.0, 0.0),
         }
     }
     pub fn opposite(self) -> Self {

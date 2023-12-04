@@ -32,6 +32,7 @@ imgui-wgpu = "0.24.0"
 imgui = "0.11.0"
 imgui-winit-support = "0.11.0"
 wgpu-types = "0.16.1"
+indexmap = "2.1.0"
 
 [dependencies.image]
 version = "0.24.6"

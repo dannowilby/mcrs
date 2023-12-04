@@ -1,10 +1,10 @@
 use rapier3d::prelude::*;
 
 use crate::{
-    chunk::{chunk_id, chunk_position, get_block, ChunkConfig, ChunkStorage, Position, player_to_position},
+    chunk::{chunk_id, chunk_position, player_to_position, Position},
     engine::{
         input::Input,
-        uniform::{Uniform, UniformData},
+        render::uniform::{Uniform, UniformData},
     },
     physics::PhysicsEngine,
     window_state,
@@ -33,7 +33,7 @@ impl Player {
             max_jump: 1.25,
             sensitivity: 0.2,
             is_flying: true,
-            last_chunk: (0,0,0)
+            last_chunk: (0, 0, 0),
         }
     }
 }
@@ -70,7 +70,7 @@ fn on_ground(physics_engine: &PhysicsEngine) -> bool {
 }
 
 /// Get the velocity from player input.
-fn calculate_player_input_velocity(input: &Input, player: &Player, delta: f64) -> glam::Vec3 {
+fn calculate_player_input_velocity(input: &Input, player: &Player, _delta: f64) -> glam::Vec3 {
     let (yaw_sin, yaw_cos) = player.yaw.sin_cos();
     let forward = glam::vec3(yaw_cos, 0.0, yaw_sin).normalize();
     let right = glam::vec3(-yaw_sin, 0.0, yaw_cos).normalize();
@@ -199,7 +199,7 @@ pub fn player_changed_chunk(
 
     // chunk loading dimensions
     let current_player_chunk = chunk_position(&data.chunk_config, &position);
-    
+
     if data.player.last_chunk != current_player_chunk {
         queue.push(Event::PlayerChunkChanged);
         data.player.last_chunk = current_player_chunk;

@@ -84,6 +84,10 @@ pub fn load_world(
     }
 }
 
+/// Load the async built chunk data into the engine,
+/// we cap out the number of chunks we load each frame to
+/// minimize the stress on the queue and decrease frame
+/// stutter when loading new chunks
 pub fn check_done_load_world(
     renderer: &mut WorldRenderer,
     _input: &mut Input,
@@ -92,8 +96,17 @@ pub fn check_done_load_world(
     _delta: f64,
 ) {
     let mut done_loading = data.done_loading.lock(0).unwrap();
-    for (chunk_id, (chunk_pos, chunk, visibility_graph, mut mesh, collider)) in done_loading.drain()
-    {
+
+    for _ in 0..5 {
+        // (chunk_pos, chunk, visibility_graph, mut mesh, collider)
+        let chunk = done_loading.pop();
+
+        if chunk.is_none() {
+            break;
+        }
+
+        let (chunk_id, (chunk_pos, chunk, visibility_graph, mut mesh, collider)) = chunk.unwrap();
+
         data.loading.remove(&chunk_id);
         data.loaded_chunks.insert(chunk_id.clone(), chunk);
         data.visibility_graphs
@@ -111,6 +124,6 @@ pub fn check_done_load_world(
         renderer
             .chunk_render_pass
             .render_objects
-            .insert(chunk_id, mesh);
+            .insert(chunk_id.clone(), mesh);
     }
 }
