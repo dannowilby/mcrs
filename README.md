@@ -30,6 +30,9 @@ All required assets are included in this repository in the assets folder, includ
 
 The `server` folder and `dev_wasm.sh` script were being used for WASM builds of this project, and are still included in case I decide to make it work with WASM again. For now, they serve no purpose to building or running this project.
 
+To view the prototype, just open `visibility_graph_prototype` in your browser. You should see the following:
+![Prototype screenshot](./screenshot1.png)
+
 ## Future Improvements
 If I come back to this project in the future, I intend to add the following features:
 - LOD support
