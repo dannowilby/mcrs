@@ -300,14 +300,6 @@ const cull = () => {
 
             // filter visibility
             if(side != "start" && chunks[chunk_id].visibility_graph[side].indexOf(next_side) == -1) {
-                /*
-                console.log("----------------------------");
-                console.log(next_chunk_id);
-                console.log(next_side);
-                console.log(chunk_id);
-                console.log(side);
-                console.log(chunks[chunk_id].visibility_graph)
-                */
                 continue;
             }
             
@@ -323,6 +315,7 @@ const cull = () => {
     console.log(`iterations: ${iterations}`);
     for (let i = 0; i < visit_order.length; i++) {
         chunks[visit_order[i]].node = i;
+        chunks[visit_order[i]].background_color = "#B3B6B7";
     }
     console.log(`Hidden:${visit_order.length / 64}`);
 };
