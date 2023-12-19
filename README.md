@@ -1,37 +1,25 @@
 
 # mcrs
-This is a minecraft-clone written in rust. It is made with WGPU and is playable on the web.
 
-## Upcoming features
+![Screenshot](./screenshot.png)
+
+A voxel game engines written in Rust with WGPU. Included is a prototype of a chunk occlusion culling system by [Tommo](https://tomcc.github.io/), written in javascript.
+
+I made this project to help me explore and learn Rust. I chose WGPU as a graphics backend so that the application would have been browser compatible, however multithreading in WASM is not where I want it to be for that yet.
+
+## Features
+- Infinite world size on all 3 axes
+- Procedural 3d terrain noise
 - Player physics
-- ~~Better meshing algorithm~~
-- Interesting generation
-- LOD meshing
-- Saving/loading chunks
+- ImGui debug menu
+- Frustum and occlusion culling
+- Downscaled rendering for style
 
-- Maybe try out libloading for loading plugins (idt WASM will cut it, there's no passing mutable data)
+I started this project by creating a rudimentary event system, so it should be easily modifiable with whatever features you want to add. If I come back to this project in the future, I will change how chunks are managed to allow for LODs and structures.
 
-## Steps to finish
-- ~~Document engine classes~~
-- ~~Make better player jump/movement physics~~
-- ~~Add ImGui to configure variables~~
-- ~~Make player physics actually work better~~
-- ~~Add visibility graph for chunk culling~~
-- ~~Compress data to send to GPU for each chunk.~~
+## How to run
+To run this project:
+1. Clone the repository
+2. Run `cargo run --release`. (I <3 Cargo)
 
-- ~~Calculate frustrum corners and cull based on that.~~
-- ~~Fix visibility culling (If we've already seen a chunk, we might want to check if we can get through from another side than the one already considered).~~
-- ~~Load chunks around player first.~~
-- ~~Add fog.~~
-- Debug renderer.
-- Add lighting (+ dithering between light levels).
-
-- Add loading screen
-- Make sure build works on WASM target
-- Be able to add/remove blocks
-
-- Load game data from JSON (or other file format) for example block models, etc...
-
-Minecraft tends to render 100-200 chunks per frame. On my computer, at 6 render distance, it gets a variable 60fps. This should be achievable here.
-// calculate frustum bounds and use to cull.
-// change rendering code so we are not rebinding the pipeline for every single chunk.
+All required assets are included in this repository in the assets folder, including the shaders and the texture atlas.
