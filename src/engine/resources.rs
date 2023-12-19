@@ -68,3 +68,43 @@ pub async fn load_binary(file_name: &str, is_asset: bool) -> anyhow::Result<Vec<
 
     Ok(data)
 }
+
+#[cfg(test)]
+mod tests {
+
+    use anyhow::anyhow;
+
+    use super::*;
+
+    #[test]
+    fn load_string_test() -> anyhow::Result<()> {
+        let path = "resources-test-text-file.txt";
+        let contents = "test text";
+        std::fs::write(path, contents)?;
+        let read_data = pollster::block_on(load_string(path, false))?;
+
+        std::fs::remove_file(path)?;
+
+        if contents == read_data {
+            return Ok(());
+        }
+
+        return Err(anyhow!("Contents did not match read data!"));
+    }
+
+    #[test]
+    fn load_binary_test() -> anyhow::Result<()> {
+        let path = "resources-test-binary-file.png";
+        let contents = "test text".as_bytes();
+        std::fs::write(path, contents)?;
+        let read_data = pollster::block_on(load_binary(path, false))?;
+
+        std::fs::remove_file(path)?;
+
+        if contents == read_data {
+            return Ok(());
+        }
+
+        return Err(anyhow!("Contents did not match read data!"));
+    }
+}

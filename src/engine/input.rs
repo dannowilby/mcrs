@@ -116,3 +116,66 @@ impl Input {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use winit::event::{DeviceId, ModifiersState};
+
+    use super::*;
+
+    #[test]
+    fn keyboard_press_event_test() {
+        let mut input = Input::new();
+
+        let key_press_event = WindowEvent::KeyboardInput {
+            device_id: unsafe { DeviceId::dummy() },
+            input: KeyboardInput {
+                state: ElementState::Pressed,
+                scancode: 0x1e,
+                virtual_keycode: Some(VirtualKeyCode::A),
+                modifiers: ModifiersState::default(),
+            },
+            is_synthetic: false,
+        };
+        let key_release_event = WindowEvent::KeyboardInput {
+            device_id: unsafe { DeviceId::dummy() },
+            input: KeyboardInput {
+                state: ElementState::Released,
+                scancode: 0x1e,
+                virtual_keycode: Some(VirtualKeyCode::A),
+                modifiers: ModifiersState::default(),
+            },
+            is_synthetic: false,
+        };
+
+        input.handle(&key_press_event);
+        assert!(input.get_key(VirtualKeyCode::A) > 0.0);
+
+        input.handle(&key_release_event);
+        assert!(input.get_key(VirtualKeyCode::A) == 0.0);
+    }
+
+    #[test]
+    fn mouse_press_event_test() {
+        let mut input = Input::new();
+
+        let mouse_press_event = WindowEvent::MouseInput {
+            device_id: unsafe { DeviceId::dummy() },
+            state: ElementState::Pressed,
+            button: MouseButton::Left,
+            modifiers: ModifiersState::default(),
+        };
+        let mouse_release_event = WindowEvent::MouseInput {
+            device_id: unsafe { DeviceId::dummy() },
+            state: ElementState::Released,
+            button: MouseButton::Left,
+            modifiers: ModifiersState::default(),
+        };
+
+        input.handle(&mouse_press_event);
+        assert!(input.get_click(MouseButton::Left) > 0.0);
+
+        input.handle(&mouse_release_event);
+        assert!(input.get_click(MouseButton::Left) == 0.0);
+    }
+}

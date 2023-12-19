@@ -314,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn visibility_graph_split_chunk() {
+    fn visibility_graph_split_x_chunk() {
         let config = create_mock_config();
         let mut split_chunk_data = ChunkData::new();
 
@@ -336,6 +336,82 @@ mod tests {
             for side2 in Side::iter() {
                 if (*side1 == Side::RIGHT && *side2 == Side::LEFT)
                     || (*side2 == Side::RIGHT && *side1 == Side::LEFT)
+                {
+                    assert!(!vis_graph.can_reach_from(*side1, *side2));
+                    continue;
+                }
+
+                assert!(
+                    vis_graph.can_reach_from(*side1, *side2),
+                    "{:?} - {:?}",
+                    side1,
+                    side2
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn visibility_graph_split_y_chunk() {
+        let config = create_mock_config();
+        let mut split_chunk_data = ChunkData::new();
+
+        // fill the chunk with blocks
+        for x in 0..config.depth {
+            for y in 0..config.depth {
+                for z in 0..config.depth {
+                    // 2 is just some random transparent that we want to check
+                    if y == 3 {
+                        split_chunk_data.insert((x, y, z), 2);
+                    }
+                }
+            }
+        }
+
+        let vis_graph = VisibilityGraph::from_chunk(&config, &split_chunk_data);
+
+        for side1 in Side::iter() {
+            for side2 in Side::iter() {
+                if (*side1 == Side::TOP && *side2 == Side::BOTTOM)
+                    || (*side2 == Side::TOP && *side1 == Side::BOTTOM)
+                {
+                    assert!(!vis_graph.can_reach_from(*side1, *side2));
+                    continue;
+                }
+
+                assert!(
+                    vis_graph.can_reach_from(*side1, *side2),
+                    "{:?} - {:?}",
+                    side1,
+                    side2
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn visibility_graph_split_z_chunk() {
+        let config = create_mock_config();
+        let mut split_chunk_data = ChunkData::new();
+
+        // fill the chunk with blocks
+        for x in 0..config.depth {
+            for y in 0..config.depth {
+                for z in 0..config.depth {
+                    // 2 is just some random transparent that we want to check
+                    if z == 3 {
+                        split_chunk_data.insert((x, y, z), 2);
+                    }
+                }
+            }
+        }
+
+        let vis_graph = VisibilityGraph::from_chunk(&config, &split_chunk_data);
+
+        for side1 in Side::iter() {
+            for side2 in Side::iter() {
+                if (*side1 == Side::FRONT && *side2 == Side::BACK)
+                    || (*side2 == Side::FRONT && *side1 == Side::BACK)
                 {
                     assert!(!vis_graph.can_reach_from(*side1, *side2));
                     continue;

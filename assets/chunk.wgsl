@@ -68,11 +68,11 @@ var s_diffuse: sampler;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // we manually set the fog color and fog start/end at this point, might be better to pass in as 
     var distance = in.distance;
-    if distance < 96.0 {
+    if distance < 128.0 {
         distance = 0.0;
     } else {
-        distance = distance - 96.0;
+        distance = distance - 128.0;
     }
-//     return mix(in.ao * textureSample(t_diffuse, s_diffuse, in.tex_coords), vec4<f32>(0.1, 0.2, 0.3, 1.0), min(distance / 32.0, 1.0));
-    return in.ao * textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    return mix(in.ao * textureSample(t_diffuse, s_diffuse, in.tex_coords), vec4<f32>(0.1, 0.2, 0.3, 1.0), min(distance / 32.0, 1.0));
+    // return in.ao * textureSample(t_diffuse, s_diffuse, in.tex_coords);
 }

@@ -1,11 +1,18 @@
 #![allow(dead_code)]
 
 use crate::{
-    engine::{render::{render_group::RenderGroup, render_object::RenderObject, uniform::Uniform}, texture::Texture},
+    engine::{
+        render::{render_group::RenderGroup, render_object::RenderObject, uniform::Uniform},
+        texture::Texture,
+    },
     window_state,
 };
 
-use super::{render_pass::{RenderPass, RenderPassViews}, render_group::RenderGroupBuilder, uniform::UniformData};
+use super::{
+    render_group::RenderGroupBuilder,
+    render_pass::{RenderPass, RenderPassViews},
+    uniform::UniformData,
+};
 
 pub struct FrameRenderPass {
     group: RenderGroup,
@@ -41,25 +48,37 @@ impl FrameRenderPass {
         let config = &window_state().config;
         let layout = Texture::create_layout(0);
         Self {
-            render_texture: Texture::create_render_texture(config.width / downscale_factor, config.height / downscale_factor).uniform(&layout),
-            group: RenderGroupBuilder::new().shader(shader_source).vertex_format(FrameVertex::description()).with("frame-buffer", layout).build(false),
+            render_texture: Texture::create_render_texture(
+                config.width / downscale_factor,
+                config.height / downscale_factor,
+            )
+            .uniform(&layout),
+            group: RenderGroupBuilder::new()
+                .shader(shader_source)
+                .vertex_format(FrameVertex::description())
+                .with("frame-buffer", layout)
+                .build(false),
             clear_color: wgpu::Color {
                 r: 0.1,
                 g: 0.2,
                 b: 0.3,
                 a: 1.0,
             },
-            frame: RenderObject::new("", bytemuck::cast_slice(vec![
-                
-                0x0000_0000,
-                0x0002_0000,
-                0x0002_0002,
-
-                0x0000_0000,
-                0x0002_0002,
-                0x0000_0002,
-                
-            ].as_slice()), bytemuck::cast_slice(vec![ 0u16, 2u16, 3u16, 0u16, 3u16, 1u16].as_slice()))
+            frame: RenderObject::new(
+                "",
+                bytemuck::cast_slice(
+                    vec![
+                        0x0000_0000,
+                        0x0002_0000,
+                        0x0002_0002,
+                        0x0000_0000,
+                        0x0002_0002,
+                        0x0000_0002,
+                    ]
+                    .as_slice(),
+                ),
+                bytemuck::cast_slice(vec![0u16, 2u16, 3u16, 0u16, 3u16, 1u16].as_slice()),
+            ),
         }
     }
 
@@ -72,7 +91,11 @@ impl FrameRenderPass {
 
     pub fn resize(&mut self, downscale_factor: u32) {
         let config = &window_state().config;
-        self.render_texture = Texture::create_render_texture(config.width / downscale_factor, config.height / downscale_factor).uniform(&Texture::create_layout(0));
+        self.render_texture = Texture::create_render_texture(
+            config.width / downscale_factor,
+            config.height / downscale_factor,
+        )
+        .uniform(&Texture::create_layout(0));
     }
 }
 
@@ -110,21 +133,23 @@ impl<T> RenderPass<T> for FrameRenderPass {
 
             // encode the render commands
             // loop over all render objects
-            
 
             render_pass.set_pipeline(&self.group.pipeline);
-            render_pass.set_bind_group(self.render_texture.location, &self.render_texture.bind_group, &[]);
+            render_pass.set_bind_group(
+                self.render_texture.location,
+                &self.render_texture.bind_group,
+                &[],
+            );
 
             // set the vertex buffer
             render_pass.set_vertex_buffer(0, self.frame.vertex_buffer.slice(..));
             // set the index buffer
             render_pass
                 .set_index_buffer(self.frame.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            let num_indices =
-            self.frame.index_buffer.size() as u32 / std::mem::size_of::<u16>() as u32;
+            // let num_indices =
+            //    self.frame.index_buffer.size() as u32 / std::mem::size_of::<u16>() as u32;
             // draw
             render_pass.draw(0..6, 0..1);
-                    
         }
         window_state()
             .queue

@@ -28,7 +28,7 @@ where
             return None;
         }
         let index = 0;
-        let elem = self.vec.swap_remove(index);
+        let elem = self.vec.remove(index);
         self.set.remove(&elem);
         Some(elem)
     }
@@ -44,5 +44,42 @@ where
     pub fn is_empty(&self) -> bool {
         assert_eq!(self.set.len(), self.vec.len());
         self.vec.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_test() {
+        let set = VecSet::<u32>::new();
+        assert!(set.is_empty());
+    }
+
+    #[test]
+    fn insert_contains_test() {
+        let mut set = VecSet::<u32>::new();
+        set.insert(45);
+        assert!(set.contains(&45));
+    }
+
+    #[test]
+    fn remove_test() {
+        let mut set = VecSet::<u32>::new();
+        set.insert(45);
+        set.remove(&45);
+        assert!(set.is_empty());
+    }
+
+    #[test]
+    fn remove_front_test() {
+        let mut set = VecSet::<u32>::new();
+        set.insert(45);
+        set.insert(67);
+        set.insert(89);
+        set.insert(10);
+        assert!(set.remove_front().is_some());
+        assert!(set.remove_front().unwrap() == 67);
     }
 }

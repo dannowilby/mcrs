@@ -1,4 +1,5 @@
-//! Module for all things involving chunks
+//! Module for all things involving chunks,
+//! is just a prototype.
 
 #![allow(dead_code)]
 
