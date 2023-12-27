@@ -169,7 +169,7 @@ pub async fn init() -> GameState<GameData, WorldRenderer, Event> {
             .build(true),
     );
 
-    let texture_uniform = texture::Texture::load("texture_atlas_low_res.png").await;
+    let texture_uniform = texture::Texture::load("texture_atlas.png").await;
     game_state.renderer.chunk_render_pass.uniforms.insert(
         "texture_atlas".to_string(),
         texture_uniform.uniform(&texture::Texture::create_layout(3)),
